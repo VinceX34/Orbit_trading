@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Orbit
 
-## Getting Started
+Lokaal bureau voor een n8n-ronde die tien spotparen tegen euro op Kraken bekijkt. Het model schrijft waarom het per coin koopt, verkoopt of wacht. Een harde poort in de workflow mag dat overrulen. Deze app zet de workflow aan of uit en bewaart het logboek.
 
-First, run the development server:
+De app start de ronde niet. n8n doet dat elk uur zelf, twee minuten over het uur, zodra de workflow gepubliceerd is.
+
+## Starten
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+De app luistert op http://127.0.0.1:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+`.env.local` heeft het workflow-id. Vul `N8N_API_KEY`. Maak de key in n8n onder Settings, API. Scopes: `workflow:read`, `workflow:activate`, `execution:list`, `execution:read`, `execution:reveal`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Wat jij nog koppelt
 
-## Learn More
+De flow heet **Orbit** en blijft unpublished tot de schakelaar omgaat: [Orbit](https://vincex34.app.n8n.cloud/workflow/BqMqaNPVxkVTT3Tt).
 
-To learn more about Next.js, take a look at the following resources:
+Op de node **Orbit** hangt de credential **OpenAi account**, model `gpt-5.4`. Zonder werkende OpenAI-key schrijft de ronde `model_offline` en gaat er geen order uit.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Kraken, later, als twee n8n-variabelen. De namen moeten exact zo zijn:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `KRAKEN_API_KEY`
+- `KRAKEN_API_SECRET`
 
-## Deploy on Vercel
+Rechten op die key: Query Funds, Query Open Orders & Trades, Query Closed Orders & Trades, Create & Modify Orders, Cancel/Close Orders. Geen Withdraw.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Zonder die variabelen leest Orbit alleen de publieke koersen en schrijft hij wachten. Er gaat geen order uit.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## De tien banen
+
+BTC, ETH, SOL, XRP, ADA, DOGE, LINK, AVAX, DOT en LTC, allemaal tegen euro. De lijst staat in de node Desk Config.
+
+Hooguit één eigen stuk per coin. Een koop is maximaal 15 euro. Orbit verkoopt alleen volume dat hij zelf heeft gekocht. Bestaand saldo op Kraken blijft liggen.
+
+Plus 1% op het vermogen van dit bureau is de streep. Daarboven geen nieuwe koop. Onder −0,5% ook niet. Een eigen stuk mag dan nog wel dicht. Het vermogen is de vrije euro plus de eigen stukken, niet je hele Kraken-rekening.
+
+Een eerste uur kan tot tien keer 15 euro inzetten als de poort ze allemaal doorlaat.

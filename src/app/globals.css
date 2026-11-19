@@ -1,26 +1,81 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --ink: #070b14;
+  --ink-2: #10182b;
+  --paper: #e7eefc;
+  --paper-dim: rgba(231, 238, 252, 0.64);
+  --violet: #8d7bff;
+  --ice: #79e1ff;
+  --mint: #8ef0c2;
+  --rose: #ff8eae;
+  --line: rgba(231, 238, 252, 0.14);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-paper: var(--paper);
+  --color-paper-dim: var(--paper-dim);
+  --color-violet: var(--violet);
+  --color-ice: var(--ice);
+  --color-mint: var(--mint);
+  --color-rose: var(--rose);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background:
+    radial-gradient(circle at 18% -10%, rgba(141, 123, 255, 0.22), transparent 32%),
+    radial-gradient(circle at 90% 0%, rgba(121, 225, 255, 0.1), transparent 26%),
+    var(--ink);
+  color: var(--paper);
+  font-family: var(--font-display), "Segoe UI", sans-serif;
+}
+
+body::before {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  opacity: 0.35;
+  background-image: radial-gradient(rgba(231, 238, 252, 0.16) 0.6px, transparent 0.6px);
+  background-size: 4px 4px;
+}
+
+a {
+  color: inherit;
+}
+
+::selection {
+  background: rgba(141, 123, 255, 0.35);
+}
+
+.orbit-mark {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.orbit-ring {
+  position: relative;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  border: 1px solid rgba(121, 225, 255, 0.55);
+  box-shadow: inset 0 0 0 6px rgba(141, 123, 255, 0.12);
+}
+
+.orbit-ring::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--ice);
+  transform: translateX(-50%);
 }
