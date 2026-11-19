@@ -1,41 +1,41 @@
 # Orbit
 
-Lokaal bureau voor een n8n-ronde die tien spotparen tegen euro op Kraken bekijkt. Het model schrijft waarom het per coin koopt, verkoopt of wacht. Een harde poort in de workflow mag dat overrulen. Deze app zet de workflow aan of uit en bewaart het logboek.
+A local desk for an n8n round that looks at ten Kraken spot pairs against euro. The model writes why it buys, sells, or waits on each coin. A hard gate in the workflow may override that. This app turns the workflow on or off and keeps the log.
 
-De app start de ronde niet. n8n doet dat elk uur zelf, twee minuten over het uur, zodra de workflow gepubliceerd is.
+The app does not start the round. n8n does that itself, every hour at two minutes past, once the workflow is published.
 
-## Starten
+## Start
 
 ```bash
 npm install
 npm run dev
 ```
 
-De app luistert op http://127.0.0.1:3000.
+The app listens on http://127.0.0.1:3000. The desk asks for `DESK_PASSWORD` before it opens.
 
-`.env.local` heeft het workflow-id. Vul `N8N_API_KEY`. Maak de key in n8n onder Settings, API. Scopes: `workflow:read`, `workflow:activate`, `execution:list`, `execution:read`, `execution:reveal`.
+`.env.local` holds the workflow id, that password, and `DATABASE_URL` from the Neon connection on Vercel. Fill in `N8N_API_KEY`. Create the key in n8n under Settings, API. Scopes: `workflow:read`, `workflow:activate`, `execution:list`, `execution:read`, `execution:reveal`.
 
-## Wat jij nog koppelt
+## What you still connect
 
-De flow heet **Orbit** en blijft unpublished tot de schakelaar omgaat: [Orbit](https://vincex34.app.n8n.cloud/workflow/BqMqaNPVxkVTT3Tt).
+The flow is named **Orbit** and stays unpublished until the switch flips: [Orbit](https://vincex34.app.n8n.cloud/workflow/BqMqaNPVxkVTT3Tt).
 
-Op de node **Orbit** hangt de credential **OpenAi account**, model `gpt-5.4`. Zonder werkende OpenAI-key schrijft de ronde `model_offline` en gaat er geen order uit.
+The **Orbit** node uses the credential **OpenAi account**, model `gpt-5.4`. Without a working OpenAI key the round writes `model_offline` and no order goes out.
 
-Kraken, later, als twee n8n-variabelen. De namen moeten exact zo zijn:
+Kraken, later, as two n8n variables. The names must be exact:
 
 - `KRAKEN_API_KEY`
 - `KRAKEN_API_SECRET`
 
-Rechten op die key: Query Funds, Query Open Orders & Trades, Query Closed Orders & Trades, Create & Modify Orders, Cancel/Close Orders. Geen Withdraw.
+Permissions on that key: Query Funds, Query Open Orders & Trades, Query Closed Orders & Trades, Create & Modify Orders, Cancel/Close Orders. No Withdraw.
 
-Zonder die variabelen leest Orbit alleen de publieke koersen en schrijft hij wachten. Er gaat geen order uit.
+Without those variables Orbit only reads the public prices and writes wait. No order goes out.
 
-## De tien banen
+## The ten lanes
 
-BTC, ETH, SOL, XRP, ADA, DOGE, LINK, AVAX, DOT en LTC, allemaal tegen euro. De lijst staat in de node Desk Config.
+BTC, ETH, SOL, XRP, ADA, DOGE, LINK, AVAX, DOT and LTC, all against euro. The list lives on the Desk Config node.
 
-Hooguit één eigen stuk per coin. Een koop is maximaal 15 euro. Orbit verkoopt alleen volume dat hij zelf heeft gekocht. Bestaand saldo op Kraken blijft liggen.
+At most one position per coin, and only volume Orbit bought itself. A buy is at most 15 euro. Balance that was already on Kraken stays put.
 
-Plus 1% op het vermogen van dit bureau is de streep. Daarboven geen nieuwe koop. Onder −0,5% ook niet. Een eigen stuk mag dan nog wel dicht. Het vermogen is de vrije euro plus de eigen stukken, niet je hele Kraken-rekening.
+Plus 1% on this desk's equity is the line. Above it, no new buy. Below −0.5%, no new buy either. An open position may still be closed. Equity is free euro plus Orbit's own holdings, not the whole Kraken account.
 
-Een eerste uur kan tot tien keer 15 euro inzetten als de poort ze allemaal doorlaat.
+A first hour can deploy up to ten times 15 euro if the gate lets every buy through.

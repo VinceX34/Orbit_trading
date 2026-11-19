@@ -1,5 +1,5 @@
 import type { CoinLane, Decision, DeskState } from "./types";
-import { listDecisions, saveDecision } from "./store";
+import { databaseUrl, listDecisions, saveDecision } from "./store";
 
 type ExecutionRow = {
   id?: string | number;
@@ -21,6 +21,7 @@ function config() {
   const missing: string[] = [];
   if (!apiKey) missing.push("N8N_API_KEY");
   if (!workflowId) missing.push("N8N_WORKFLOW_ID");
+  if (!databaseUrl()) missing.push("DATABASE_URL");
   return { baseUrl, apiKey, workflowId, missing };
 }
 
@@ -122,7 +123,7 @@ async function syncExecutions(workflowId: string): Promise<string | null> {
     response = await n8n(`/executions?${query.toString()}`);
   }
   if (!response.ok) {
-    return `Executions ophalen lukte niet (${response.status}).`;
+    return `Could not fetch executions (${response.status}).`;
   }
   const body = (await response.json()) as { data?: ExecutionRow[] };
   for (const execution of body.data ?? []) {
@@ -130,7 +131,7 @@ async function syncExecutions(workflowId: string): Promise<string | null> {
     const json = decisionFromRun(execution);
     const decision = toDecision(execution, json);
     if (!decision.reason && !decision.action && decision.coins.length === 0 && decision.status === "success") continue;
-    saveDecision(decision, json ?? { status: decision.status, error: decision.reason });
+    await saveDecision(decision, json ?? { status: decision.status, error: decision.reason });
   }
   return null;
 }
@@ -152,15 +153,15 @@ export async function loadDesk(): Promise<DeskState> {
     decisions: [],
   };
   if (missing.length) {
-    base.decisions = listDecisions();
+    base.decisions = await listDecisions();
     return base;
   }
 
   try {
     const workflowResponse = await n8n(`/workflows/${workflowId}`);
     if (!workflowResponse.ok) {
-      base.error = `Workflow ophalen lukte niet (${workflowResponse.status}). Controleer de API-key en het workflow-id.`;
-      base.decisions = listDecisions();
+      base.error = `Could not fetch the workflow (${workflowResponse.status}). Check the API key and the workflow id.`;
+      base.decisions = await listDecisions();
       return base;
     }
     const workflow = (await workflowResponse.json()) as Record<string, unknown>;
@@ -168,11 +169,11 @@ export async function loadDesk(): Promise<DeskState> {
     base.workflowName = typeof workflow.name === "string" ? workflow.name : null;
     const syncError = await syncExecutions(workflowId);
     base.error = syncError;
-    base.decisions = listDecisions();
+    base.decisions = await listDecisions();
     return base;
   } catch (error) {
-    base.error = error instanceof Error ? error.message : "Onbekende fout naar n8n.";
-    base.decisions = listDecisions();
+    base.error = error instanceof Error ? error.message : "Unknown error talking to n8n.";
+    base.decisions = await listDecisions();
     return base;
   }
 }
@@ -181,7 +182,7 @@ export async function setPublished(active: boolean): Promise<DeskState> {
   const { workflowId, missing } = config();
   if (missing.length) {
     const state = await loadDesk();
-    state.error = "Zet eerst de ontbrekende waarden in .env.local.";
+    state.error = "Fill in the missing values in .env.local first.";
     return state;
   }
 
@@ -193,7 +194,7 @@ export async function setPublished(active: boolean): Promise<DeskState> {
   }
   if (!response.ok) {
     const state = await loadDesk();
-    state.error = `Aan of uit zetten lukte niet (${response.status}). De API-key heeft workflow:activate nodig.`;
+    state.error = `Could not switch the workflow (${response.status}). The API key needs workflow:activate.`;
     return state;
   }
   return loadDesk();

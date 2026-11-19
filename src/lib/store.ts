@@ -1,45 +1,61 @@
-import fs from "node:fs";
-import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import { neon } from "@neondatabase/serverless";
 import type { CoinLane, Decision, OrderFill } from "./types";
 
-type Store = { db: DatabaseSync };
+type Sql = ReturnType<typeof neon>;
+type Row = Record<string, unknown>;
 
-const globalStore = globalThis as typeof globalThis & { __orbit?: Store };
+const globalStore = globalThis as typeof globalThis & { __orbitSql?: Sql; __orbitReady?: Promise<void> };
 
-function database(): DatabaseSync {
-  if (globalStore.__orbit) return globalStore.__orbit.db;
-  const dir = path.join(process.cwd(), "data");
-  fs.mkdirSync(dir, { recursive: true });
-  const db = new DatabaseSync(path.join(dir, "desk.sqlite"));
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS decisions (
-      execution_id TEXT PRIMARY KEY,
-      started_at TEXT,
-      status TEXT NOT NULL,
-      pair TEXT,
-      action TEXT,
-      ai_action TEXT,
-      reason TEXT,
-      thesis TEXT,
-      invalidation TEXT,
-      mood TEXT,
-      confidence REAL,
-      blocked_by_rule TEXT,
-      order_json TEXT,
-      equity_quote REAL,
-      day_pnl_pct REAL,
-      in_position INTEGER,
-      raw_json TEXT,
-      coins_json TEXT
-    )
-  `);
-  const columns = db.prepare("PRAGMA table_info(decisions)").all() as { name: string }[];
-  if (!columns.some((column) => column.name === "coins_json")) {
-    db.exec("ALTER TABLE decisions ADD COLUMN coins_json TEXT");
+export function databaseUrl(): string {
+  return (process.env.DATABASE_URL || process.env.POSTGRES_URL || "").trim();
+}
+
+function client(): Sql {
+  if (globalStore.__orbitSql) return globalStore.__orbitSql;
+  const url = databaseUrl();
+  if (!url) throw new Error("DATABASE_URL is missing.");
+  globalStore.__orbitSql = neon(url);
+  return globalStore.__orbitSql;
+}
+
+function rowsOf(result: unknown): Row[] {
+  if (Array.isArray(result)) return result as Row[];
+  if (result && typeof result === "object" && Array.isArray((result as { rows?: unknown }).rows)) {
+    return (result as { rows: Row[] }).rows;
   }
-  globalStore.__orbit = { db };
-  return db;
+  return [];
+}
+
+async function ready(): Promise<void> {
+  if (!databaseUrl()) return;
+  if (!globalStore.__orbitReady) {
+    const sql = client();
+    globalStore.__orbitReady = sql
+      .query(
+        `CREATE TABLE IF NOT EXISTS decisions (
+          execution_id TEXT PRIMARY KEY,
+          started_at TEXT,
+          status TEXT NOT NULL,
+          pair TEXT,
+          action TEXT,
+          ai_action TEXT,
+          reason TEXT,
+          thesis TEXT,
+          invalidation TEXT,
+          mood TEXT,
+          confidence DOUBLE PRECISION,
+          blocked_by_rule TEXT,
+          order_json TEXT,
+          equity_quote DOUBLE PRECISION,
+          day_pnl_pct DOUBLE PRECISION,
+          in_position BOOLEAN,
+          raw_json TEXT,
+          coins_json TEXT
+        )`,
+      )
+      .then(() => undefined);
+  }
+  await globalStore.__orbitReady;
 }
 
 function numberOrNull(value: unknown): number | null {
@@ -77,34 +93,39 @@ function coinsFrom(value: unknown): CoinLane[] {
   });
 }
 
-export function saveDecision(input: Decision, raw: unknown): void {
-  database()
-    .prepare(
-      `INSERT INTO decisions (
-        execution_id, started_at, status, pair, action, ai_action, reason, thesis,
-        invalidation, mood, confidence, blocked_by_rule, order_json, equity_quote,
-        day_pnl_pct, in_position, raw_json, coins_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(execution_id) DO UPDATE SET
-        started_at = excluded.started_at,
-        status = excluded.status,
-        pair = excluded.pair,
-        action = excluded.action,
-        ai_action = excluded.ai_action,
-        reason = excluded.reason,
-        thesis = excluded.thesis,
-        invalidation = excluded.invalidation,
-        mood = excluded.mood,
-        confidence = excluded.confidence,
-        blocked_by_rule = excluded.blocked_by_rule,
-        order_json = excluded.order_json,
-        equity_quote = excluded.equity_quote,
-        day_pnl_pct = excluded.day_pnl_pct,
-        in_position = excluded.in_position,
-        raw_json = excluded.raw_json,
-        coins_json = excluded.coins_json`,
-    )
-    .run(
+function held(value: unknown): boolean | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "boolean") return value;
+  return Number(value) === 1;
+}
+
+export async function saveDecision(input: Decision, raw: unknown): Promise<void> {
+  await ready();
+  await client().query(
+    `INSERT INTO decisions (
+      execution_id, started_at, status, pair, action, ai_action, reason, thesis,
+      invalidation, mood, confidence, blocked_by_rule, order_json, equity_quote,
+      day_pnl_pct, in_position, raw_json, coins_json
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+    ON CONFLICT (execution_id) DO UPDATE SET
+      started_at = excluded.started_at,
+      status = excluded.status,
+      pair = excluded.pair,
+      action = excluded.action,
+      ai_action = excluded.ai_action,
+      reason = excluded.reason,
+      thesis = excluded.thesis,
+      invalidation = excluded.invalidation,
+      mood = excluded.mood,
+      confidence = excluded.confidence,
+      blocked_by_rule = excluded.blocked_by_rule,
+      order_json = excluded.order_json,
+      equity_quote = excluded.equity_quote,
+      day_pnl_pct = excluded.day_pnl_pct,
+      in_position = excluded.in_position,
+      raw_json = excluded.raw_json,
+      coins_json = excluded.coins_json`,
+    [
       input.executionId,
       input.startedAt,
       input.status,
@@ -120,18 +141,21 @@ export function saveDecision(input: Decision, raw: unknown): void {
       input.order ? JSON.stringify(input.order) : null,
       input.equityQuote,
       input.dayPnlPct,
-      input.inPosition === null ? null : input.inPosition ? 1 : 0,
+      input.inPosition,
       JSON.stringify(raw),
       JSON.stringify(input.coins),
-    );
+    ],
+  );
 }
 
-export function listDecisions(limit = 40): Decision[] {
-  const rows = database()
-    .prepare(`SELECT * FROM decisions ORDER BY COALESCE(started_at, execution_id) DESC LIMIT ?`)
-    .all(limit);
-
-  return rows.map((row) => ({
+export async function listDecisions(limit = 40): Promise<Decision[]> {
+  if (!databaseUrl()) return [];
+  await ready();
+  const result = await client().query(
+    `SELECT * FROM decisions ORDER BY COALESCE(started_at, execution_id) DESC LIMIT $1`,
+    [limit],
+  );
+  return rowsOf(result).map((row) => ({
     executionId: String(row.execution_id),
     startedAt: row.started_at ? String(row.started_at) : null,
     status: String(row.status),
@@ -147,7 +171,7 @@ export function listDecisions(limit = 40): Decision[] {
     order: row.order_json ? orderFrom(JSON.parse(String(row.order_json))) : null,
     equityQuote: numberOrNull(row.equity_quote),
     dayPnlPct: numberOrNull(row.day_pnl_pct),
-    inPosition: row.in_position === null || row.in_position === undefined ? null : Number(row.in_position) === 1,
+    inPosition: held(row.in_position),
     coins: row.coins_json ? coinsFrom(JSON.parse(String(row.coins_json))) : [],
   }));
 }

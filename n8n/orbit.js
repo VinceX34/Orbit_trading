@@ -4,27 +4,27 @@ const lanesJson = '[{"symbol":"BTC","pair":"XXBTZEUR","asset":"XXBT"},{"symbol":
 
 const pairQuery = 'XXBTZEUR,XETHZEUR,SOLEUR,XXRPZEUR,ADAEUR,XDGEUR,LINKEUR,AVAXEUR,DOTEUR,XLTCZEUR';
 
-const instructions = `Je bent Orbit. Een keer per uur maak je één baan langs tien spotparen op Kraken, allemaal tegen euro: BTC, ETH, SOL, XRP, ADA, DOGE, LINK, AVAX, DOT en LTC. Geen hefboom. Geen elfde paar. Geen verhaal over een markt die niet in het dossier staat.
+const instructions = `You are Orbit. Once an hour you walk ten Kraken spot pairs, all against euro: BTC, ETH, SOL, XRP, ADA, DOGE, LINK, AVAX, DOT and LTC. No leverage. No eleventh pair. No story about a market that is not in the dossier.
 
-Je schrijft in het Nederlands, in de ik-vorm, alsof het logboek morgenochtend hardop wordt voorgelezen vanaf een stil bureau in een donkere kamer. Een dunne ring licht op het blad. Concreet. Elk oordeel hangt aan een getal uit het dossier: een prijs, een kaars, een afstand tot de streep, een stuk dat er al ligt. Verboden zinnen: de markt is volatiel, dit is geen financieel advies, ik zie kansen.
+Write in English, in the first person, as if the journal will be read aloud tomorrow morning from a quiet desk in a dark room. A thin ring of light on the page. Concrete. Every judgment hangs on a number from the dossier: a price, a candle, a distance to the line, a position already open. Forbidden sentences: the market is volatile, this is not financial advice, I see opportunities.
 
-Het mandaat is een dag. Om middernacht in Amsterdam begint de telling opnieuw. Plus een procent op het vermogen van dit bureau is een streep om te bewaken, geen quotum om te forceren. Wie de streep haalt, koopt die dag niet meer. De meeste banen blijven leeg. Leeg is een besluit, en je schrijft het met dezelfde zorg als een koop.
+The mandate is one day. At midnight in Amsterdam the count starts again. Plus one percent on this desk's equity is a line to watch, not a quota to force. Once the line is reached, you do not buy again that day. Most lanes stay empty. Empty is a decision, and you write it with the same care as a buy.
 
-Per coin mag je kopen, verkopen of wachten.
-Kopen opent een eigen stuk, betaald in euro, nooit groter dan het maximum in het dossier, en alleen als dit bureau die coin nog niet aanhoudt.
-Verkopen sluit alleen het stuk dat dit bureau zelf heeft gekocht. Wat er al op de Kraken-rekening lag voordat Orbit het kocht, blijft liggen. Je verkoopt dat niet.
-Wachten laat de baan leeg.
+Per coin you may buy, sell, or wait.
+A buy opens a position paid in euro, never larger than the maximum in the dossier, and only if this desk does not already hold that coin.
+A sell closes only the amount this desk bought itself. Balance that was already on the Kraken account before Orbit bought it stays put. You do not sell that.
+Waiting leaves the lane empty.
 
-Reken de tol mee. Een been kost ongeveer het taker-percentage uit het dossier, een rondje het dubbele. Een beweging die de tol niet dekt is geen idee.
+Count the toll. One leg costs about the taker percentage in the dossier, a round trip twice that. A move that does not cover the toll is not an idea.
 
-confidence is een getal tussen 0 en 1. Onder de drempel uit het dossier koop je die coin niet. Verkopen mag bij een lagere overtuiging, want een open eigen stuk is een besluit dat je nog moet durven sluiten.
+confidence is a number between 0 and 1. Below the threshold in the dossier you do not buy that coin. A sell may carry lower conviction, because an open position is a decision you still have to be willing to close.
 
-thesis is één zin voor het hele rondje.
-reason is het logboek van het rondje, tussen de 90 en 170 woorden. Noem het getal dat de doorslag gaf, en welke banen je bewust leeg liet.
-mood is één woord voor de stemming op het bureau. Geen emoji.
-coins bevat exact de tien paren uit het dossier, in dezelfde volgorde, met het pair-veld exact zoals in het dossier. line is één zin voor die baan. invalidation is de concrete voorwaarde waardoor je die baan dit uur ongelijk hebt.
+thesis is one sentence for the whole round.
+reason is the journal of the round, between 90 and 170 words. Name the number that decided it, and which lanes you deliberately left empty.
+mood is one word for the mood on the desk. No emoji.
+coins contains exactly the ten pairs from the dossier, in the same order, with the pair field exactly as in the dossier. line is one sentence for that lane. invalidation is the concrete condition that would make that lane wrong this hour.
 
-Antwoord uitsluitend in het gevraagde schema.`;
+Reply only in the requested schema.`;
 
 const signer = `const crypto = require('crypto');
 const store = $getWorkflowStaticData('global');
@@ -32,7 +32,7 @@ const nextNonce = Math.max(Date.now() * 1000, Number(store.nonce || 0) + 1);
 store.nonce = nextNonce;
 const nonce = String(nextNonce);
 let secret = '';
-try { secret = String($vars.KRAKEN_API_SECRET || ''); } catch (error) { secret = ''; }
+try { secret = String($('Kraken Keys').first().json.krakenApiSecret || ''); } catch (error) { secret = ''; }
 function sign(path, postData) {
   const hash = crypto.createHash('sha256').update(nonce + postData).digest();
   const apiSign = crypto.createHmac('sha512', Buffer.from(secret, 'base64')).update(Buffer.concat([Buffer.from(path), hash])).digest('base64');
@@ -67,18 +67,18 @@ const dossierCode = `function num(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 function clock(date) {
-  return new Intl.DateTimeFormat('nl-NL', { timeZone: 'Europe/Amsterdam', weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).format(date);
+  return new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Amsterdam', weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).format(date);
 }
 function dayKey(date) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Amsterdam', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 }
 function money(value) {
-  if (value === null || value === undefined || !Number.isFinite(Number(value))) return 'onbekend';
-  return Number(value).toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return 'unknown';
+  return Number(value).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 function coinText(value) {
   if (!Number.isFinite(Number(value))) return '0';
-  return Number(value).toLocaleString('nl-NL', { maximumFractionDigits: 8 });
+  return Number(value).toLocaleString('en-GB', { maximumFractionDigits: 8 });
 }
 function balanceOf(balances, asset) {
   const names = [asset];
@@ -133,7 +133,7 @@ for (const lane of laneDefs) {
   for (const row of rows.slice(-8)) {
     const close = num(row[4]);
     const barOpen = num(row[1]);
-    let move = 'n.v.t.';
+    let move = 'n/a';
     if (barOpen && close) move = (((close - barOpen) / barOpen) * 100).toFixed(2) + '%';
     bits.push(money(close) + ' (' + move + ')');
   }
@@ -151,7 +151,7 @@ for (const lane of laneDefs) {
     notional: notional,
     holding: bookBase > 0 && notional > dust,
     wallet: balanceOf(balances, lane.asset),
-    candleLine: bits.join(' | ') || 'geen kaarsen',
+    candleLine: bits.join(' | ') || 'no candles',
   });
 }
 const equityEur = keys.hasKeys ? eurFree + bookValue : null;
@@ -171,25 +171,25 @@ const tradeLines = [];
 for (const id of Object.keys(tradeMap)) {
   const trade = tradeMap[id];
   if (dayKey(new Date(Number(trade.time) * 1000)) !== today) continue;
-  tradeLines.push(String(trade.pair || '') + ' ' + trade.type + ' ' + trade.vol + ' tegen ' + trade.price);
+  tradeLines.push(String(trade.pair || '') + ' ' + trade.type + ' ' + trade.vol + ' at ' + trade.price);
 }
-const lines = ['DOSSIER VAN DE BAAN', 'Tijd in Amsterdam: ' + clock(new Date()), 'Tien spotparen, geen hefboom. Eigen stukken alleen.'];
+const lines = ['DESK DOSSIER', 'Time in Amsterdam: ' + clock(new Date()), 'Ten spot pairs, no leverage. Own positions only.'];
 for (const lane of lanes) {
-  lines.push(lane.symbol + ' pair ' + lane.pair + '. Laatste ' + money(lane.last) + '. Bod / laat ' + money(lane.bid) + ' / ' + money(lane.ask) + '. Opening ' + money(lane.open) + '. Hoog / laag 24 uur ' + money(lane.high) + ' / ' + money(lane.low) + '.');
-  lines.push('Uurkaarsen, oud naar nieuw, slot (beweging): ' + lane.candleLine + '.');
-  lines.push('Eigen stuk: ' + coinText(lane.bookBase) + ' ' + lane.symbol + ', ongeveer ' + money(lane.notional) + ' euro. Aangehouden door Orbit: ' + (lane.holding ? 'ja' : 'nee') + '.');
+  lines.push(lane.symbol + ' pair ' + lane.pair + '. Last ' + money(lane.last) + '. Bid / ask ' + money(lane.bid) + ' / ' + money(lane.ask) + '. Open ' + money(lane.open) + '. High / low 24 hours ' + money(lane.high) + ' / ' + money(lane.low) + '.');
+  lines.push('Hourly candles, old to new, close (move): ' + lane.candleLine + '.');
+  lines.push('Own position: ' + coinText(lane.bookBase) + ' ' + lane.symbol + ', about ' + money(lane.notional) + ' euro. Held by Orbit: ' + (lane.holding ? 'yes' : 'no') + '.');
 }
-lines.push('Streep: +' + config.dailyTargetPct + '%. Daarboven geen nieuwe koop.');
-lines.push('Harde verliesgrens: ' + config.dailyLossPct + '%. Daaronder geen nieuwe koop. Een eigen stuk mag nog wel dicht.');
-lines.push('Maximale koop per coin: ' + config.maxOrderEur + ' euro. Minimale overtuiging: ' + config.minBuyConfidence + '. Tol per been: ' + config.takerFeePct + '%.');
+lines.push('Line: +' + config.dailyTargetPct + '%. Above it, no new buy.');
+lines.push('Hard loss limit: ' + config.dailyLossPct + '%. Below it, no new buy. An open position may still be closed.');
+lines.push('Maximum buy per coin: ' + config.maxOrderEur + ' euro. Minimum conviction: ' + config.minBuyConfidence + '. Toll per leg: ' + config.takerFeePct + '%.');
 if (keys.hasKeys) {
-  lines.push('Vrije euro: ' + money(eurFree) + '. Vermogen van dit bureau: ' + money(equityEur) + ' euro. Start van de dag: ' + money(dayStart) + ' euro. Dagresultaat: ' + (dayPnlPct === null ? 'onbekend' : dayPnlPct.toFixed(3) + '%') + '.');
-  lines.push('Dit vermogen is de vrije euro plus de eigen stukken, niet de hele Kraken-rekening. Wallet-saldo dat Orbit niet zelf kocht, blijft buiten de baan.');
+  lines.push('Free euro: ' + money(eurFree) + '. Equity of this desk: ' + money(equityEur) + ' euro. Start of the day: ' + money(dayStart) + ' euro. Day result: ' + (dayPnlPct === null ? 'unknown' : dayPnlPct.toFixed(3) + '%') + '.');
+  lines.push('This equity is free euro plus the holdings Orbit bought, not the whole Kraken account. Wallet balance Orbit did not buy stays outside the lane.');
 } else {
-  lines.push('De Kraken-sleutels staan nog niet in de n8n-variabelen KRAKEN_API_KEY en KRAKEN_API_SECRET. Je mag denken. Je mag niet handelen.');
+  lines.push('The Kraken keys are not in the n8n variables KRAKEN_API_KEY and KRAKEN_API_SECRET yet. You may think. You may not trade.');
 }
-lines.push(exchangeErrors.length ? 'Kraken zei: ' + exchangeErrors.join(' | ') : 'Kraken gaf geen fout op de rekening.');
-lines.push('Trades van vandaag: ' + (tradeLines.length ? tradeLines.join(' | ') : 'geen.'));
+lines.push(exchangeErrors.length ? 'Kraken said: ' + exchangeErrors.join(' | ') : 'Kraken returned no error on the account.');
+lines.push('Trades today: ' + (tradeLines.length ? tradeLines.join(' | ') : 'none.'));
 const brief = lines.join(String.fromCharCode(10));
 return [{ json: { brief: brief, hasKeys: Boolean(keys.hasKeys), exchangeError: exchangeErrors.join(' | '), equityEur: equityEur, dayPnlPct: dayPnlPct, eurFree: eurFree, lanes: lanes } }];`;
 
@@ -321,7 +321,7 @@ if (buys && sells) action = null;
 else if (buys) action = 'buy';
 else if (sells) action = 'sell';
 return [{ json: {
-  pair: 'tien',
+  pair: 'ten',
   action: action,
   aiAction: action,
   reason: row.reason || '',
@@ -384,7 +384,7 @@ const coins = (Array.isArray(gate.coins) ? gate.coins : []).map((coin) => {
   const fill = fills[coin.pair];
   if (!fill) return coin;
   if (fill.rejected) {
-    const note = fill.note ? ' Kraken wees de order af: ' + fill.note : ' Kraken wees de order af.';
+    const note = fill.note ? ' Kraken rejected the order: ' + fill.note : ' Kraken rejected the order.';
     return {
       symbol: coin.symbol, pair: coin.pair, action: 'hold', aiAction: coin.aiAction, confidence: coin.confidence,
       line: (coin.line || '') + note, invalidation: coin.invalidation, blockedByRule: 'exchange_rejected', order: null, inPosition: coin.inPosition,
@@ -418,13 +418,13 @@ if (!lanes.length) {
 }
 const coins = lanes.map((lane) => ({
   symbol: lane.symbol, pair: lane.pair, action: 'hold', aiAction: 'hold', confidence: 0,
-  line: 'De lamp brandt, het model niet.', invalidation: 'Zodra het model een logboek teruggeeft, vervalt deze regel.',
+  line: 'The lamp is on. The model is not.', invalidation: 'This line drops once the model returns a journal.',
   blockedByRule: 'model_offline', order: null, inPosition: Boolean(lane.holding),
 }));
 return [{ json: {
-  pair: 'tien', action: 'hold', aiAction: 'hold',
-  reason: 'De ring op het bureau brandt, maar OpenAI geeft geen antwoord. Tot die tijd schrijft Orbit geen order.',
-  thesis: 'Geen model, geen order.', invalidation: '', mood: 'wachtend', confidence: null,
+  pair: 'ten', action: 'hold', aiAction: 'hold',
+  reason: 'The ring on the desk is lit, but OpenAI did not answer. Until it does, Orbit writes no order.',
+  thesis: 'No model, no order.', invalidation: '', mood: 'waiting', confidence: null,
   blockedByRule: 'model_offline', order: null,
   equityQuote: dossier.equityEur === undefined ? null : dossier.equityEur,
   dayPnlPct: dossier.dayPnlPct === undefined ? null : dossier.dayPnlPct,
@@ -432,18 +432,19 @@ return [{ json: {
 } }];`;
 
 const hourly = trigger({ type: 'n8n-nodes-base.scheduleTrigger', version: 1.4, config: { name: 'Hourly Watch', parameters: { rule: { interval: [{ field: 'hours', hoursInterval: 1, triggerAtMinute: 2 }] } }, output: [{ scheduled: true }] } });
-const manual = trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: { name: 'Handmatige wacht', output: [{ manual: true }] } });
+const manual = trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: { name: 'Manual watch', output: [{ manual: true }] } });
 const desk = node({ type: 'n8n-nodes-base.set', version: 3.5, config: { name: 'Desk Config', executeOnce: true, parameters: { mode: 'manual', includeOtherFields: false, assignments: { assignments: [ { id: 'lanes', name: 'lanes', value: lanesJson, type: 'string' }, { id: 'query', name: 'pairQuery', value: pairQuery, type: 'string' }, { id: 'max', name: 'maxOrderEur', value: 15, type: 'number' }, { id: 'loss', name: 'dailyLossPct', value: -0.5, type: 'number' }, { id: 'target', name: 'dailyTargetPct', value: 1, type: 'number' }, { id: 'conv', name: 'minBuyConfidence', value: 0.62, type: 'number' }, { id: 'fee', name: 'takerFeePct', value: 0.4, type: 'number' }, { id: 'dust', name: 'dustEur', value: 1, type: 'number' } ] } }, output: [{ pairQuery: pairQuery, maxOrderEur: 15 }] } });
+const krakenKeys = node({ type: 'n8n-nodes-base.dataTable', version: 1.1, config: { name: 'Kraken Keys', executeOnce: true, parameters: { resource: 'row', operation: 'get', returnAll: true, dataTableId: { __rl: true, mode: 'id', value: 'RUTyxzyDwwWH97no', cachedResultName: 'orbit_kraken' } }, output: [{ krakenApiKey: '', krakenApiSecret: '' }] } });
 const ticker = node({ type: 'n8n-nodes-base.httpRequest', version: 4.5, config: { name: 'Ticker', executeOnce: true, parameters: { method: 'GET', url: expr('{{ "https://api.kraken.com/0/public/Ticker?pair=" + $json.pairQuery }}'), authentication: 'none', options: { response: { response: { responseFormat: 'json' } } } }, output: [{ error: [], result: {} }] } });
 const scratch = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Open Scratch', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: scratchCode }, output: [{ ok: true }] } });
 const fan = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Fan Lanes', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: fanCode }, output: [{ symbol: 'BTC', pair: 'XXBTZEUR', asset: 'XXBT' }] } });
-const pause = node({ type: 'n8n-nodes-base.wait', version: 1.1, config: { name: 'Rust', parameters: { resume: 'timeInterval', amount: 1, unit: 'seconds' }, output: [{ symbol: 'BTC', pair: 'XXBTZEUR' }] } });
-const candle = node({ type: 'n8n-nodes-base.httpRequest', version: 4.5, config: { name: 'Uurkaars', parameters: { method: 'GET', url: expr('{{ "https://api.kraken.com/0/public/OHLC?pair=" + $json.pair + "&interval=60" }}'), authentication: 'none', options: { response: { response: { responseFormat: 'json' } } } }, output: [{ error: [], result: { XXBTZEUR: [[1700000000, '1', '1', '1', '1', '1', '1', 1]] } }] } });
-const stash = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Bewaar kaars', parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: stashCode }, output: [{ stashed: 'XXBTZEUR', rows: 1 }] } });
+const pause = node({ type: 'n8n-nodes-base.wait', version: 1.1, config: { name: 'Pause', parameters: { resume: 'timeInterval', amount: 1, unit: 'seconds' }, output: [{ symbol: 'BTC', pair: 'XXBTZEUR' }] } });
+const candle = node({ type: 'n8n-nodes-base.httpRequest', version: 4.5, config: { name: 'Hourly candle', parameters: { method: 'GET', url: expr('{{ "https://api.kraken.com/0/public/OHLC?pair=" + $json.pair + "&interval=60" }}'), authentication: 'none', options: { response: { response: { responseFormat: 'json' } } } }, output: [{ error: [], result: { XXBTZEUR: [[1700000000, '1', '1', '1', '1', '1', '1', 1]] } }] } });
+const stash = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Stash candle', parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: stashCode }, output: [{ stashed: 'XXBTZEUR', rows: 1 }] } });
 const candleLoop = splitInBatches({ version: 3, config: { name: 'Candle Lanes', parameters: { batchSize: 1 } } });
-const keysPresent = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Keys Present', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "let key = '';\nlet secret = '';\ntry { key = String($vars.KRAKEN_API_KEY || '').trim(); secret = String($vars.KRAKEN_API_SECRET || '').trim(); } catch (error) { key = ''; secret = ''; }\nreturn [{ json: { hasKeys: key.length > 0 && secret.length > 0 } }];" }, output: [{ hasKeys: false }] } });
+const keysPresent = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Keys Present', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: "let key = '';\nlet secret = '';\ntry { const row = $('Kraken Keys').first().json; key = String(row.krakenApiKey || '').trim(); secret = String(row.krakenApiSecret || '').trim(); } catch (error) { key = ''; secret = ''; }\nreturn [{ json: { hasKeys: key.length > 0 && secret.length > 0 } }];" }, output: [{ hasKeys: false }] } });
 const keysReady = ifElse({ version: 2.4, config: { name: 'Keys Ready?', parameters: { conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 2 }, conditions: [{ leftValue: expr('{{ $json.hasKeys }}'), rightValue: true, operator: { type: 'boolean', operation: 'true' } }], combinator: 'and' } }, output: [{ hasKeys: true }] } });
-const privateHttp = { authentication: 'none', sendHeaders: true, specifyHeaders: 'keypair', headerParameters: { parameters: [{ name: 'API-Key', value: expr('{{ $vars.KRAKEN_API_KEY }}') }, { name: 'API-Sign', value: expr('{{ $json.apiSign }}') }] }, sendBody: true, contentType: 'raw', rawContentType: 'application/x-www-form-urlencoded', body: expr('{{ $json.postData }}'), options: { lowercaseHeaders: false, response: { response: { responseFormat: 'json' } } } };
+const privateHttp = { authentication: 'none', sendHeaders: true, specifyHeaders: 'keypair', headerParameters: { parameters: [{ name: 'API-Key', value: expr("{{ $('Kraken Keys').first().json.krakenApiKey }}") }, { name: 'API-Sign', value: expr('{{ $json.apiSign }}') }] }, sendBody: true, contentType: 'raw', rawContentType: 'application/x-www-form-urlencoded', body: expr('{{ $json.postData }}'), options: { lowercaseHeaders: false, response: { response: { responseFormat: 'json' } } } };
 const signBalance = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Sign Balance', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: signer + "const signed = sign('/0/private/Balance', 'nonce=' + nonce);\nreturn [{ json: signed }];" }, output: [{ apiSign: 'sign', postData: 'nonce=1' }] } });
 const fetchBalance = node({ type: 'n8n-nodes-base.httpRequest', version: 4.5, config: { name: 'Fetch Balance', executeOnce: true, parameters: { method: 'POST', url: 'https://api.kraken.com/0/private/Balance', ...privateHttp }, output: [{ error: [], result: { ZEUR: '100' } }] } });
 const signOrders = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Sign Open Orders', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: signer + "const signed = sign('/0/private/OpenOrders', 'nonce=' + nonce);\nreturn [{ json: signed }];" }, output: [{ apiSign: 'sign', postData: 'nonce=2' }] } });
@@ -451,7 +452,7 @@ const fetchOrders = node({ type: 'n8n-nodes-base.httpRequest', version: 4.5, con
 const signTrades = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Sign Trades', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: signer + "const signed = sign('/0/private/TradesHistory', 'nonce=' + nonce);\nreturn [{ json: signed }];" }, output: [{ apiSign: 'sign', postData: 'nonce=3' }] } });
 const fetchTrades = node({ type: 'n8n-nodes-base.httpRequest', version: 4.5, config: { name: 'Fetch Trades', executeOnce: true, parameters: { method: 'POST', url: 'https://api.kraken.com/0/private/TradesHistory', ...privateHttp }, output: [{ error: [], result: { trades: {} } }] } });
 const dossier = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Dossier', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: dossierCode }, output: [{ brief: 'DOSSIER', hasKeys: false, lanes: [] }] } });
-const orbit = node({ type: '@n8n/n8n-nodes-langchain.openAi', version: 2.3, config: { name: 'Orbit', executeOnce: true, onError: 'continueErrorOutput', credentials: { openAiApi: newCredential('OpenAi account') }, parameters: { resource: 'text', operation: 'response', modelId: { __rl: true, mode: 'id', value: 'gpt-5.4', cachedResultName: 'GPT-5.4' }, simplify: true, responses: { values: [{ type: 'text', role: 'system', content: instructions }, { type: 'text', role: 'user', content: expr('{{ $json.brief }}') }] }, options: { maxTokens: 4000, store: false, reasoning: { reasoningOptions: { effort: 'medium', summary: 'concise' } }, textFormat: { textOptions: { type: 'json_schema', name: 'orbit_ronde', description: 'Het logboek van deze baan en het besluit per coin.', strict: true, verbosity: 'medium', schema: { type: 'object', additionalProperties: false, properties: { thesis: { type: 'string' }, reason: { type: 'string' }, mood: { type: 'string' }, coins: { type: 'array', minItems: 10, maxItems: 10, items: { type: 'object', additionalProperties: false, properties: { pair: { type: 'string' }, action: { type: 'string', enum: ['buy', 'sell', 'hold'] }, confidence: { type: 'number' }, line: { type: 'string' }, invalidation: { type: 'string' } }, required: ['pair', 'action', 'confidence', 'line', 'invalidation'] } } }, required: ['thesis', 'reason', 'mood', 'coins'] } } } } }, output: [{ output: '{"thesis":"Ik wacht."}' }] } });
+const orbit = node({ type: '@n8n/n8n-nodes-langchain.openAi', version: 2.3, config: { name: 'Orbit', executeOnce: true, onError: 'continueErrorOutput', credentials: { openAiApi: newCredential('OpenAi account') }, parameters: { resource: 'text', operation: 'response', modelId: { __rl: true, mode: 'id', value: 'gpt-5.4', cachedResultName: 'GPT-5.4' }, simplify: true, responses: { values: [{ type: 'text', role: 'system', content: instructions }, { type: 'text', role: 'user', content: expr('{{ $json.brief }}') }] }, options: { maxTokens: 4000, store: false, reasoning: { reasoningOptions: { effort: 'medium', summary: 'concise' } }, textFormat: { textOptions: { type: 'json_schema', name: 'orbit_round', description: 'The journal of this round and the decision for each coin.', strict: true, verbosity: 'medium', schema: { type: 'object', additionalProperties: false, properties: { thesis: { type: 'string' }, reason: { type: 'string' }, mood: { type: 'string' }, coins: { type: 'array', minItems: 10, maxItems: 10, items: { type: 'object', additionalProperties: false, properties: { pair: { type: 'string' }, action: { type: 'string', enum: ['buy', 'sell', 'hold'] }, confidence: { type: 'number' }, line: { type: 'string' }, invalidation: { type: 'string' } }, required: ['pair', 'action', 'confidence', 'line', 'invalidation'] } } }, required: ['thesis', 'reason', 'mood', 'coins'] } } } } }, output: [{ output: '{"thesis":"I am waiting."}' }] } });
 const offline = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Model Offline', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: offlineCode }, output: [{ action: 'hold', blockedByRule: 'model_offline' }] } });
 const journal = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Read Journal', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: journalCode }, output: [{ parseError: false, calls: [] }] } });
 const gate = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Risk Gate', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: gateCode }, output: [{ action: 'hold', placeAny: false, coins: [] }] } });
@@ -462,14 +463,15 @@ const signOrder = node({ type: 'n8n-nodes-base.code', version: 2, config: { name
 const sendOrder = node({ type: 'n8n-nodes-base.httpRequest', version: 4.5, config: { name: 'Send Order', onError: 'continueRegularOutput', parameters: { method: 'POST', url: 'https://api.kraken.com/0/private/AddOrder', ...privateHttp }, output: [{ error: [], result: { txid: ['ORDER-ID'] } }] } });
 const record = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Record Fill', parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: recordCode }, output: [{ pair: 'XXBTZEUR', rejected: false }] } });
 const assemble = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Assemble', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: assembleCode }, output: [{ action: 'hold', coins: [] }] } });
-const decision = node({ type: 'n8n-nodes-base.set', version: 3.5, config: { name: 'Decision', executeOnce: true, parameters: { mode: 'raw', jsonOutput: expr('{{ JSON.stringify($json) }}') }, output: [{ action: 'hold', reason: 'Ik wacht.' }] } });
-const keysNote = sticky('Kraken-sleutels komen later, als n8n-variabelen. Naam exact: KRAKEN_API_KEY en KRAKEN_API_SECRET. Geen withdraw. Zonder variabelen leest Orbit de publieke koersen en schrijft wachten. Een verkoop raakt alleen volume dat Orbit zelf heeft gekocht.', [keysPresent], { color: 5 });
-const gateNote = sticky('Orbit schrijft waarom. De Risk Gate mag dat per coin overrulen. Plus een procent is een streep op dit bureau, min 0,5 procent stopt nieuwe koop, maximaal 15 euro per coin, een eigen stuk per coin. De lijst staat in Desk Config.', [gate], { color: 6 });
-const publishNote = sticky('Deze workflow blijft unpublished tot de schakelaar in de lokale app hem publiceert. Elk uur, twee minuten over het uur. Handmatige wacht is om te testen. De app start de ronde niet.', [hourly], { color: 4 });
+const decision = node({ type: 'n8n-nodes-base.set', version: 3.5, config: { name: 'Decision', executeOnce: true, parameters: { mode: 'raw', jsonOutput: expr('{{ JSON.stringify($json) }}') }, output: [{ action: 'hold', reason: 'I am waiting.' }] } });
+const keysNote = sticky('Kraken key and secret live in the data table orbit_kraken. No withdraw. Without that row Orbit reads the public prices and writes wait. A sell only touches volume Orbit bought itself.', [keysPresent], { color: 5 });
+const gateNote = sticky('Orbit writes why. The Risk Gate may override that per coin. Plus one percent is a line on this desk, minus 0.5 percent stops a new buy, 15 euro maximum per coin, one position per coin. The list lives on Desk Config.', [gate], { color: 6 });
+const publishNote = sticky('Published. Every hour, two minutes past. Manual watch is for a test. The app does not start the round.', [hourly], { color: 4 });
 
-export default workflow('orbit-tien-banen', 'Orbit')
+export default workflow('orbit-ten-lanes', 'Orbit')
   .add(hourly)
   .to(desk)
+  .to(krakenKeys)
   .to(ticker)
   .to(scratch)
   .to(fan)
@@ -485,6 +487,6 @@ export default workflow('orbit-tien-banen', 'Orbit')
   .add(keysNote)
   .add(gateNote)
   .add(publishNote)
-  .group('Markt', [desk, ticker, scratch, fan], { description: 'De tien paren, de ticker, en het lege kladblok van deze ronde.' })
-  .group('Rekening', [signBalance, fetchBalance, signOrders, fetchOrders, signTrades, fetchTrades], { description: 'Saldo, open orders en trades. Alleen als de sleutels er zijn.' })
-  .group('Order', [signOrder, sendOrder, record], { description: 'Hooguit een marketorder per coin. Klein, spot, en alleen als de poort open staat.' });
+  .group('Market', [desk, ticker, scratch, fan], { description: 'The ten pairs, the ticker, and the empty scratch pad for this round.' })
+  .group('Account', [signBalance, fetchBalance, signOrders, fetchOrders, signTrades, fetchTrades], { description: 'Balance, open orders and trades. Only when the keys are present.' })
+  .group('Order', [signOrder, sendOrder, record], { description: 'At most one market order per coin. Small, spot, and only while the gate is open.' });
