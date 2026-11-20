@@ -1,19 +1,19 @@
 import { workflow, node, trigger, ifElse, sticky, newCredential, expr, splitInBatches, nextBatch } from '@n8n/workflow-sdk';
 
 const lanesJson = JSON.stringify([
-  { symbol: 'BTC', pair: 'XXBTZEUR', alt: 'XBTEUR', asset: 'XXBT', ordermin: 0.00006, pdec: 1 },
-  { symbol: 'ETH', pair: 'XETHZEUR', alt: 'ETHEUR', asset: 'XETH', ordermin: 0.002, pdec: 2 },
-  { symbol: 'SOL', pair: 'SOLEUR', alt: 'SOLEUR', asset: 'SOL', ordermin: 0.05, pdec: 2 },
-  { symbol: 'XRP', pair: 'XXRPZEUR', alt: 'XRPEUR', asset: 'XXRP', ordermin: 4, pdec: 5 },
-  { symbol: 'ADA', pair: 'ADAEUR', alt: 'ADAEUR', asset: 'ADA', ordermin: 20, pdec: 6 },
-  { symbol: 'DOGE', pair: 'XDGEUR', alt: 'XDGEUR', asset: 'XXDG', ordermin: 50, pdec: 7 },
-  { symbol: 'LINK', pair: 'LINKEUR', alt: 'LINKEUR', asset: 'LINK', ordermin: 0.35, pdec: 5 },
-  { symbol: 'AVAX', pair: 'AVAXEUR', alt: 'AVAXEUR', asset: 'AVAX', ordermin: 0.5, pdec: 3 },
-  { symbol: 'DOT', pair: 'DOTEUR', alt: 'DOTEUR', asset: 'DOT', ordermin: 3.9, pdec: 4 },
-  { symbol: 'LTC', pair: 'XLTCZEUR', alt: 'LTCEUR', asset: 'XLTC', ordermin: 0.08, pdec: 2 },
+  { symbol: 'BTC', pair: 'XBTUSDC', alt: 'XBTUSDC', asset: 'XXBT', ordermin: 0.00006, pdec: 2, canShort: true },
+  { symbol: 'ETH', pair: 'ETHUSDC', alt: 'ETHUSDC', asset: 'XETH', ordermin: 0.002, pdec: 2, canShort: true },
+  { symbol: 'SOL', pair: 'SOLUSDC', alt: 'SOLUSDC', asset: 'SOL', ordermin: 0.05, pdec: 2, canShort: true },
+  { symbol: 'XRP', pair: 'XRPUSDC', alt: 'XRPUSDC', asset: 'XXRP', ordermin: 4, pdec: 5, canShort: true },
+  { symbol: 'ADA', pair: 'ADAUSDC', alt: 'ADAUSDC', asset: 'ADA', ordermin: 20, pdec: 6, canShort: true },
+  { symbol: 'DOGE', pair: 'XDGUSDC', alt: 'XDGUSDC', asset: 'XXDG', ordermin: 50, pdec: 5, canShort: true },
+  { symbol: 'LINK', pair: 'LINKUSDC', alt: 'LINKUSDC', asset: 'LINK', ordermin: 0.35, pdec: 5, canShort: true },
+  { symbol: 'AVAX', pair: 'AVAXUSDC', alt: 'AVAXUSDC', asset: 'AVAX', ordermin: 0.5, pdec: 3, canShort: false },
+  { symbol: 'DOT', pair: 'DOTUSDC', alt: 'DOTUSDC', asset: 'DOT', ordermin: 3.9, pdec: 4, canShort: true },
+  { symbol: 'LTC', pair: 'LTCUSDC', alt: 'LTCUSDC', asset: 'XLTC', ordermin: 0.08, pdec: 3, canShort: true },
 ]);
 
-const pairQuery = 'XXBTZEUR,XETHZEUR,SOLEUR,XXRPZEUR,ADAEUR,XDGEUR,LINKEUR,AVAXEUR,DOTEUR,XLTCZEUR';
+const pairQuery = 'XBTUSDC,ETHUSDC,SOLUSDC,XRPUSDC,ADAUSDC,XDGUSDC,LINKUSDC,AVAXUSDC,DOTUSDC,LTCUSDC';
 
 const deskValues = {
   lanes: lanesJson,
@@ -30,7 +30,7 @@ const deskValues = {
   orbitRef: 7071,
 };
 
-const instructions = `You are Orbit. Once an hour you read ten Kraken pairs against euro: BTC, ETH, SOL, XRP, ADA, DOGE, LINK, AVAX, DOT and LTC. You trade both directions. A long is bought on spot. A short is sold on margin at the leverage in the dossier and bought back later. No other pairs. No story about a market that is not in the dossier.
+const instructions = `You are Orbit. Once an hour you read ten Kraken pairs against USDC: BTC, ETH, SOL, XRP, ADA, DOGE, LINK, AVAX, DOT and LTC. You trade both directions. A long is bought on spot. A short is sold on margin at the leverage in the dossier and bought back later. A coin marked long only in the dossier cannot be shorted. No other pairs. No story about a market that is not in the dossier.
 
 The book holds at most two positions at the same time, across all ten coins. Each position may use at most the share of desk equity in the dossier. Pick the best setups: two, one, or none. Most hours the right answer is to wait. Waiting is a decision, and you write it with the same care as a trade.
 
@@ -43,7 +43,7 @@ sizePct is the share of desk equity for this position, between 5 and the maximum
 
 Per coin you choose one action:
 long opens a long position, only when that coin has no position.
-short opens a short position, only when that coin has no position.
+short opens a short position, only when that coin has no position and is not marked long only.
 close closes the open position on that coin, long or short.
 hold does nothing. On an open position it leaves the stop and target in place.
 
@@ -194,7 +194,7 @@ if (balanceBody && Array.isArray(balanceBody.error) && balanceBody.error.length)
 if (ordersBody && Array.isArray(ordersBody.error) && ordersBody.error.length) exchangeErrors.push(ordersBody.error.join(', '));
 if (tradesBody && Array.isArray(tradesBody.error) && tradesBody.error.length) exchangeErrors.push(tradesBody.error.join(', '));
 const balances = balanceBody && balanceBody.result ? balanceBody.result : {};
-const eurFree = num(balances.ZEUR) || 0;
+const eurFree = num(balances.USDC) || 0;
 const tradeMap = tradesBody && tradesBody.result && tradesBody.result.trades ? tradesBody.result.trades : {};
 const openMap = ordersBody && ordersBody.result && ordersBody.result.open ? ordersBody.result.open : {};
 const orbitRef = Number(config.orbitRef);
@@ -277,12 +277,12 @@ for (const lane of laneDefs) {
     };
   }
   lanes.push({
-    symbol: lane.symbol, pair: lane.pair, asset: lane.asset, alt: lane.alt, pdec: digits, ordermin: Number(lane.ordermin) || 0,
+    symbol: lane.symbol, pair: lane.pair, asset: lane.asset, alt: lane.alt, pdec: digits, ordermin: Number(lane.ordermin) || 0, canShort: lane.canShort !== false,
     last: last, bid: bid, ask: ask, open: open, low: low, high: high, volume24: volume24,
     position: position, holding: Boolean(position), exit: exits[lane.pair] || '',
   });
   const text = [];
-  text.push(lane.symbol + ' (pair ' + lane.pair + '). Last ' + px(last, digits) + ', bid ' + px(bid, digits) + ', ask ' + px(ask, digits) + '. 24 hours: open ' + px(open, digits) + ', high ' + px(high, digits) + ', low ' + px(low, digits) + ', volume ' + vol(volume24) + '.');
+  text.push(lane.symbol + ' (pair ' + lane.pair + ')' + (lane.canShort === false ? ', long only' : '') + '. Last ' + px(last, digits) + ', bid ' + px(bid, digits) + ', ask ' + px(ask, digits) + '. 24 hours: open ' + px(open, digits) + ', high ' + px(high, digits) + ', low ' + px(low, digits) + ', volume ' + vol(volume24) + '.');
   text.push('Hourly: ' + (hourly.join(' | ') || 'no candles'));
   text.push('Daily (UTC): ' + (daily.join(' | ') || 'no candles'));
   if (position) {
@@ -313,13 +313,13 @@ for (const id of Object.keys(tradeMap)) {
 }
 const openCount = lanes.filter((lane) => lane.holding).length;
 const nl = String.fromCharCode(10);
-const lines = ['DESK DOSSIER', 'Time in Amsterdam: ' + clock(new Date()), 'Ten Kraken pairs against euro. Long on spot, short on margin at ' + config.shortLeverage + 'x. At most ' + config.maxPositions + ' positions at once.', 'Candles are open/high/low/close/volume, old to new. Volume is in the coin. The newest hourly candle is still forming.', ''];
+const lines = ['DESK DOSSIER', 'Time in Amsterdam: ' + clock(new Date()), 'Ten Kraken pairs against USDC. Prices and amounts are in USDC. Long on spot, short on margin at ' + config.shortLeverage + 'x. At most ' + config.maxPositions + ' positions at once.', 'Candles are open/high/low/close/volume, old to new. Volume is in the coin. The newest hourly candle is still forming.', ''];
 lines.push(blocks.join(nl + nl));
 lines.push('');
 lines.push('Open positions: ' + openCount + ' of ' + config.maxPositions + '.');
 if (equityEur !== null) {
-  lines.push('Desk equity: ' + eur(equityEur) + ' euro, which is free euro ' + eur(eurFree) + ' plus the open positions. Start of the day: ' + eur(dayStart) + '. Day result: ' + (dayPnlPct === null ? 'unknown' : dayPnlPct.toFixed(3) + '%') + '.');
-  lines.push('Maximum per position: ' + config.maxSizePct + '% of desk equity, about ' + eur((equityEur * Number(config.maxSizePct)) / 100) + ' euro.');
+  lines.push('Desk equity: ' + eur(equityEur) + ' USDC, which is free USDC ' + eur(eurFree) + ' plus the open positions. Start of the day: ' + eur(dayStart) + '. Day result: ' + (dayPnlPct === null ? 'unknown' : dayPnlPct.toFixed(3) + '%') + '.');
+  lines.push('Maximum per position: ' + config.maxSizePct + '% of desk equity, about ' + eur((equityEur * Number(config.maxSizePct)) / 100) + ' USDC.');
 }
 lines.push('Stop distance: at most ' + config.maxStopPct + '% and at least ' + config.minStopPct + '% from the last price. Minimum conviction: ' + config.minConfidence + '. Toll per leg: ' + config.takerFeePct + '%. A short also pays roughly 0.02% to open and again every 4 hours.');
 lines.push('Day line: +' + config.dailyTargetPct + '%. Above it no new position. Loss limit: ' + config.dailyLossPct + '%. Below it no new position. Closing is always allowed.');
@@ -384,7 +384,7 @@ const gateCode = `function findCall(calls, lane) {
   const pair = String(lane.pair || '').toUpperCase();
   for (const call of calls) {
     const raw = String(call.pair || '').toUpperCase();
-    const key = raw.replace('/EUR', '').replace('EUR', '');
+    const key = raw.replace('/USDC', '').replace('USDC', '');
     if (raw === pair || raw === symbol || key === symbol || key === pair) return call;
   }
   return null;
@@ -441,7 +441,8 @@ for (const lane of lanes) {
   else if ((action === 'long' || action === 'short') && pos) { action = 'hold'; blocked = 'already_in_position'; }
   else if (action === 'long' || action === 'short') {
     const ref = lane.last;
-    if (loss) blocked = 'daily_loss';
+    if (action === 'short' && lane.canShort === false) blocked = 'no_short';
+    else if (loss) blocked = 'daily_loss';
     else if (topped) blocked = 'target_reached';
     else if (confidence < minConfidence) blocked = 'low_conviction';
     else if (!ref || stop === null || target === null) blocked = 'invalid_setup';
@@ -660,17 +661,17 @@ const desk = node({ type: 'n8n-nodes-base.set', version: 3.5, config: { name: 'D
 const krakenKeys = node({ type: 'n8n-nodes-base.dataTable', version: 1.1, config: { name: 'Kraken Keys', executeOnce: true, parameters: { resource: 'row', operation: 'get', returnAll: true, dataTableId: { __rl: true, mode: 'id', value: 'RUTyxzyDwwWH97no', cachedResultName: 'orbit_kraken' } }, output: [{ krakenApiKey: '', krakenApiSecret: '' }] } });
 const ticker = node({ type: 'n8n-nodes-base.httpRequest', version: 4.5, config: { name: 'Ticker', executeOnce: true, parameters: { method: 'GET', url: expr('{{ "https://api.kraken.com/0/public/Ticker?pair=" + $(\'Desk Config\').first().json.pairQuery }}'), authentication: 'none', options: { response: { response: { responseFormat: 'json' } } } }, output: [{ error: [], result: {} }] } });
 const scratch = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Open Scratch', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: scratchCode }, output: [{ ok: true }] } });
-const fan = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Fan Lanes', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: fanCode }, output: [{ symbol: 'BTC', pair: 'XXBTZEUR', asset: 'XXBT' }] } });
-const pause = node({ type: 'n8n-nodes-base.wait', version: 1.1, config: { name: 'Pause', parameters: { resume: 'timeInterval', amount: 1, unit: 'seconds' }, output: [{ symbol: 'BTC', pair: 'XXBTZEUR' }] } });
-const candle = node({ type: 'n8n-nodes-base.httpRequest', version: 4.5, config: { name: 'Hourly candle', parameters: { method: 'GET', url: expr('{{ "https://api.kraken.com/0/public/OHLC?pair=" + $json.pair + "&interval=60" }}'), authentication: 'none', options: { response: { response: { responseFormat: 'json' } } } }, output: [{ error: [], result: { XXBTZEUR: [[1700000000, '1', '1', '1', '1', '1', '1', 1]] } }] } });
-const stash = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Stash candle', parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: stashCode }, output: [{ stashed: 'XXBTZEUR', rows: 1 }] } });
+const fan = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Fan Lanes', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: fanCode }, output: [{ symbol: 'BTC', pair: 'XBTUSDC', asset: 'XXBT' }] } });
+const pause = node({ type: 'n8n-nodes-base.wait', version: 1.1, config: { name: 'Pause', parameters: { resume: 'timeInterval', amount: 1, unit: 'seconds' }, output: [{ symbol: 'BTC', pair: 'XBTUSDC' }] } });
+const candle = node({ type: 'n8n-nodes-base.httpRequest', version: 4.5, config: { name: 'Hourly candle', parameters: { method: 'GET', url: expr('{{ "https://api.kraken.com/0/public/OHLC?pair=" + $json.pair + "&interval=60" }}'), authentication: 'none', options: { response: { response: { responseFormat: 'json' } } } }, output: [{ error: [], result: { XBTUSDC: [[1700000000, '1', '1', '1', '1', '1', '1', 1]] } }] } });
+const stash = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Stash candle', parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: stashCode }, output: [{ stashed: 'XBTUSDC', rows: 1 }] } });
 const candleLoop = splitInBatches({ version: 3, config: { name: 'Candle Lanes', parameters: { batchSize: 1 } } });
 const keysPresent = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Keys Present', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: keysPresentCode }, output: [{ hasKeys: false }] } });
 const keysReady = ifElse({ version: 2.4, config: { name: 'Keys Ready?', parameters: { conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 2 }, conditions: [{ leftValue: expr('{{ $json.hasKeys }}'), rightValue: true, operator: { type: 'boolean', operation: 'true' } }], combinator: 'and' } }, output: [{ hasKeys: true }] } });
 const privateHeaders = { parameters: [{ name: 'API-Key', value: expr("{{ $('Kraken Keys').first().json.krakenApiKey }}") }, { name: 'API-Sign', value: expr('{{ $json.apiSign }}') }] };
 const privateHttp = { authentication: 'none', sendHeaders: true, specifyHeaders: 'keypair', headerParameters: privateHeaders, sendBody: true, contentType: 'raw', rawContentType: 'application/x-www-form-urlencoded', body: expr('{{ $json.postData }}'), options: { lowercaseHeaders: false, response: { response: { responseFormat: 'json' } } } };
 const signBalance = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Sign Balance', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: signBalanceCode }, output: [{ apiSign: 'sign', postData: 'nonce=1' }] } });
-const fetchBalance = node({ type: 'n8n-nodes-base.httpRequest', version: 4.5, config: { name: 'Fetch Balance', executeOnce: true, parameters: { method: 'POST', url: 'https://api.kraken.com/0/private/Balance', ...privateHttp }, output: [{ error: [], result: { ZEUR: '100' } }] } });
+const fetchBalance = node({ type: 'n8n-nodes-base.httpRequest', version: 4.5, config: { name: 'Fetch Balance', executeOnce: true, parameters: { method: 'POST', url: 'https://api.kraken.com/0/private/Balance', ...privateHttp }, output: [{ error: [], result: { USDC: '100' } }] } });
 const signOrders = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Sign Open Orders', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: signOpenOrdersCode }, output: [{ apiSign: 'sign', postData: 'nonce=2' }] } });
 const fetchOrders = node({ type: 'n8n-nodes-base.httpRequest', version: 4.5, config: { name: 'Fetch Open Orders', executeOnce: true, parameters: { method: 'POST', url: 'https://api.kraken.com/0/private/OpenOrders', ...privateHttp }, output: [{ error: [], result: { open: {} } }] } });
 const signTrades = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Sign Trades', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: signTradesCode }, output: [{ apiSign: 'sign', postData: 'nonce=3' }] } });
@@ -681,11 +682,11 @@ const offline = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 
 const journal = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Read Journal', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: journalCode }, output: [{ parseError: false, calls: [] }] } });
 const gate = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Risk Gate', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: gateCode }, output: [{ action: 'hold', placeAny: false, coins: [] }] } });
 const place = ifElse({ version: 2.4, config: { name: 'Place Orders?', parameters: { conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 2 }, conditions: [{ leftValue: expr('{{ $json.placeAny }}'), rightValue: true, operator: { type: 'boolean', operation: 'true' } }], combinator: 'and' } }, output: [{ placeAny: false }] } });
-const fanOrders = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Fan Orders', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: fanOrdersCode }, output: [{ kind: 'open', pair: 'XXBTZEUR', side: 'long', volume: '0.001' }] } });
+const fanOrders = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Fan Orders', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: fanOrdersCode }, output: [{ kind: 'open', pair: 'XBTUSDC', side: 'long', volume: '0.001' }] } });
 const orderLoop = splitInBatches({ version: 3, config: { name: 'Order Lanes', parameters: { batchSize: 1 } } });
 const signOrder = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Sign Order', parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: signOrderCode }, output: [{ apiSign: 'sign', postData: 'nonce=4', path: '/0/private/AddOrder' }] } });
 const sendOrder = node({ type: 'n8n-nodes-base.httpRequest', version: 4.5, config: { name: 'Send Order', onError: 'continueRegularOutput', parameters: { method: 'POST', url: expr('{{ "https://api.kraken.com" + $json.path }}'), ...privateHttp }, output: [{ error: [], result: { txid: ['ORDER-ID'] } }] } });
-const record = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Record Fill', parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: recordCode }, output: [{ pair: 'XXBTZEUR', kind: 'open', rejected: false }] } });
+const record = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Record Fill', parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: recordCode }, output: [{ pair: 'XBTUSDC', kind: 'open', rejected: false }] } });
 const assemble = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Assemble', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: assembleCode }, output: [{ action: 'hold', coins: [] }] } });
 const decision = node({ type: 'n8n-nodes-base.set', version: 3.5, config: { name: 'Decision', executeOnce: true, parameters: { mode: 'raw', jsonOutput: expr('{{ JSON.stringify($json) }}') }, output: [{ action: 'hold', reason: 'I am waiting.' }] } });
 const keysNote = sticky(keysNoteText, [keysPresent], { color: 5 });

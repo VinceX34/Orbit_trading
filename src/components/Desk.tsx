@@ -22,9 +22,9 @@ function formatPct(value: number | null): string {
   return `${sign}${value.toFixed(2)}%`;
 }
 
-function formatEur(value: number | null): string {
+function formatUsdc(value: number | null): string {
   if (value === null) return "—";
-  return new Intl.NumberFormat("en-GB", { style: "currency", currency: "EUR" }).format(value);
+  return `${new Intl.NumberFormat("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)} USDC`;
 }
 
 function tone(action: string | null): string {
@@ -184,7 +184,7 @@ export function Desk({ view }: { view: "desk" | "log" }) {
         {state?.error ? <p className="mt-4 text-sm leading-6 text-rose">{state.error}</p> : null}
         <div className="mt-6">
           <Tide pct={latest?.dayPnlPct ?? null} />
-          <p className="mt-2 font-mono text-xs text-paper-dim">Desk {formatEur(latest?.equityQuote ?? null)}</p>
+          <p className="mt-2 font-mono text-xs text-paper-dim">Desk {formatUsdc(latest?.equityQuote ?? null)}</p>
         </div>
       </aside>
 

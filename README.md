@@ -1,6 +1,6 @@
 # Orbit
 
-A local desk for an n8n round that reads ten Kraken pairs against euro and trades both directions. The model picks its own setups, long or short, with a stop and a target per trade. A hard gate in the workflow may override that. This app turns the workflow on or off and keeps the log.
+A local desk for an n8n round that reads ten Kraken pairs against USDC and trades both directions. The model picks its own setups, long or short, with a stop and a target per trade. A hard gate in the workflow may override that. This app turns the workflow on or off and keeps the log.
 
 The app does not start the round. n8n does that itself, every hour at two minutes past, once the workflow is published.
 
@@ -27,10 +27,10 @@ Without the keys Orbit only reads the public prices and writes wait. No order go
 
 ## The rules
 
-BTC, ETH, SOL, XRP, ADA, DOGE, LINK, AVAX, DOT and LTC, all against euro. All numbers below live on the Desk Config node.
+BTC, ETH, SOL, XRP, ADA, DOGE, LINK, AVAX, DOT and LTC, all against USDC. All numbers below live on the Desk Config node.
 
-- At most two positions at once, each at most 45% of desk equity. Desk equity is free euro plus Orbit's own positions, not the rest of the Kraken account.
-- A long is a spot buy. A short is a margin sell at 2x leverage.
+- At most two positions at once, each at most 45% of desk equity. Desk equity is free USDC plus Orbit's own positions, not the rest of the Kraken account.
+- A long is a spot buy. A short is a margin sell at 2x leverage. AVAX/USDC has no margin on Kraken, so AVAX is long only.
 - Every opening carries a real stop-loss order on Kraken, at most 1.5% and at least 0.3% from the price.
 - The target must pay the round-trip fee. The desk closes the position in the first round after the price touches it.
 - Conviction below 0.62 opens nothing.
