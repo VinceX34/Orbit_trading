@@ -157,6 +157,22 @@ export function Desk({ view }: { view: "desk" | "log" }) {
     setBusy(false);
   }
 
+  async function run() {
+    if (!state?.configured || busy) return;
+    setBusy(true);
+    const response = await fetch("/api/desk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ run: true }),
+    });
+    if (response.status === 401) {
+      window.location.href = "/login";
+      return;
+    }
+    setState((await response.json()) as DeskState);
+    setBusy(false);
+  }
+
   const latest = state?.decisions[0];
   const on = Boolean(state?.published);
 
@@ -175,8 +191,17 @@ export function Desk({ view }: { view: "desk" | "log" }) {
           </span>
           <span className="pr-4 font-mono text-xs uppercase tracking-[0.16em] text-violet">{busy ? "wait" : on ? "published" : "quiet"}</span>
         </button>
+        <button
+          type="button"
+          onClick={() => void run()}
+          disabled={!state?.configured || busy}
+          className="mt-3 w-full rounded-full border border-[var(--line)] px-4 py-3 font-mono text-xs uppercase tracking-[0.18em] text-ice hover:bg-ink disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {busy ? "wait" : "Run now"}
+        </button>
+        {state?.notice ? <p className="mt-3 text-sm leading-6 text-ice">{state.notice}</p> : null}
         <p className="mt-4 text-sm leading-6 text-paper-dim">
-          {state?.workflowName || "Orbit"}. Off means n8n will not start the next round. A round already running still finishes its hour.
+          Run now switches Orbit on and starts a round right away. {state?.workflowName || "Orbit"}. Off means n8n will not start the next round. A round already running still finishes its hour.
         </p>
         {state && !state.configured ? (
           <p className="mt-4 text-sm leading-6 text-ice">Missing in .env.local: {state.missing.join(", ")}.</p>

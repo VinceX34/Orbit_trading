@@ -653,9 +653,10 @@ return [{ json: {
 
 const keysNoteText = 'Kraken key and secret live in the data table orbit_kraken. No withdraw permission. Shorts run on Kraken margin with the same key, so margin must be enabled on the account. Without the row Orbit reads prices and writes wait.';
 const gateNoteText = 'Orbit picks and plans every trade. The Risk Gate checks it: at most two positions, each at most 45% of desk equity, a stop within 1.5%, a target that pays the fees, conviction above 0.62, and the day limits. Every opening carries a real stop-loss on Kraken. The numbers live on Desk Config.';
-const publishNoteText = 'Published means every hour, two minutes past. Manual watch is for a test. The app only switches publish on and off.';
+const publishNoteText = 'Published means every hour, two minutes past. Run Now is the webhook behind the app button, guarded by the x-orbit-token header; sync.mjs sets it from ORBIT_RUN_TOKEN. Do not use Manual watch with live keys: a manual run trades but does not remember its positions.';
 
 const hourly = trigger({ type: 'n8n-nodes-base.scheduleTrigger', version: 1.4, config: { name: 'Hourly Watch', parameters: { rule: { interval: [{ field: 'hours', hoursInterval: 1, triggerAtMinute: 2 }] } }, output: [{ scheduled: true }] } });
+const runNow = trigger({ type: 'n8n-nodes-base.webhook', version: 2.2, config: { name: 'Run Now', parameters: { httpMethod: 'POST', path: 'orbit-run-now', authentication: 'none', responseMode: 'onReceived', options: { noResponseBody: true } }, output: [{ headers: {} }] } });
 const manual = trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: { name: 'Manual watch', output: [{ manual: true }] } });
 const desk = node({ type: 'n8n-nodes-base.set', version: 3.5, config: { name: 'Desk Config', executeOnce: true, parameters: { mode: 'manual', includeOtherFields: false, assignments: { assignments: Object.entries(deskValues).map(([name, value]) => ({ id: name, name: name, value: value, type: typeof value === 'number' ? 'number' : 'string' })) } }, output: [{ pairQuery: pairQuery }] } });
 const krakenKeys = node({ type: 'n8n-nodes-base.dataTable', version: 1.1, config: { name: 'Kraken Keys', executeOnce: true, parameters: { resource: 'row', operation: 'get', returnAll: true, dataTableId: { __rl: true, mode: 'id', value: 'RUTyxzyDwwWH97no', cachedResultName: 'orbit_kraken' } }, output: [{ krakenApiKey: '', krakenApiSecret: '' }] } });
@@ -701,6 +702,8 @@ export default workflow('orbit-ten-lanes', 'Orbit')
   .to(scratch)
   .to(fan)
   .to(candleLoop.onEachBatch(pause.to(candle).to(stash).to(nextBatch(candleLoop))).onDone(keysPresent.to(keysReady.onTrue(signBalance.to(fetchBalance).to(signOrders).to(fetchOrders).to(signTrades).to(fetchTrades).to(dossier)).onFalse(dossier))))
+  .add(runNow)
+  .to(desk)
   .add(manual)
   .to(desk)
   .add(dossier)

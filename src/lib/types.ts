@@ -54,5 +54,6 @@ export type DeskState = {
   workflowName: string | null;
   workflowId: string | null;
   error: string | null;
+  notice?: string | null;
   decisions: Decision[];
 };

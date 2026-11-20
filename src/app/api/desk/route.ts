@@ -1,5 +1,5 @@
 import { connection } from "next/server";
-import { loadDesk, setPublished } from "@/lib/n8n";
+import { loadDesk, runNow, setPublished } from "@/lib/n8n";
 
 export async function GET() {
   await connection();
@@ -9,7 +9,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   await connection();
-  const body = (await request.json()) as { active?: boolean };
-  const state = await setPublished(Boolean(body.active));
+  const body = (await request.json()) as { active?: boolean; run?: boolean };
+  const state = body.run ? await runNow() : await setPublished(Boolean(body.active));
   return Response.json(state, { headers: { "Cache-Control": "no-store" } });
 }

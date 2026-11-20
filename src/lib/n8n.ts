@@ -211,3 +211,38 @@ export async function setPublished(active: boolean): Promise<DeskState> {
   }
   return loadDesk();
 }
+
+export async function runNow(): Promise<DeskState> {
+  const { baseUrl, missing } = config();
+  const token = process.env.ORBIT_RUN_TOKEN || "";
+  if (missing.length || !token) {
+    const state = await loadDesk();
+    state.error = token ? "Fill in the missing values in .env.local first." : "ORBIT_RUN_TOKEN is missing.";
+    return state;
+  }
+
+  const before = await loadDesk();
+  if (before.error) return before;
+  if (!before.published) {
+    const switched = await setPublished(true);
+    if (switched.error) return switched;
+  }
+
+  let status = 0;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const response = await fetch(`${baseUrl}/webhook/orbit-run-now`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-orbit-token": token },
+      body: JSON.stringify({ source: "desk" }),
+      cache: "no-store",
+    });
+    status = response.status;
+    if (response.ok) break;
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
+
+  const state = await loadDesk();
+  state.error = status >= 200 && status < 300 ? null : `n8n did not take the run (${status}).`;
+  state.notice = state.error ? null : "Round started. The page fills in a minute or two.";
+  return state;
+}

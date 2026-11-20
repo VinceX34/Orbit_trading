@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 process.loadEnvFile(new URL('../.env.local', import.meta.url));
@@ -81,6 +82,34 @@ orbit.options = {
     },
   },
 };
+
+const runToken = process.env.ORBIT_RUN_TOKEN || '';
+if (!runToken) throw new Error('ORBIT_RUN_TOKEN is missing in .env.local');
+let runNow = wf.nodes.find((item) => item.name === 'Run Now');
+if (!runNow) {
+  const hourly = named('Hourly Watch');
+  runNow = {
+    id: crypto.randomUUID(),
+    webhookId: crypto.randomUUID(),
+    name: 'Run Now',
+    type: 'n8n-nodes-base.webhook',
+    typeVersion: 2.2,
+    position: [hourly.position[0], hourly.position[1] + 360],
+    parameters: {},
+  };
+  wf.nodes.push(runNow);
+}
+runNow.parameters = {
+  httpMethod: 'POST',
+  path: 'orbit-run-now',
+  authentication: 'none',
+  responseMode: 'onReceived',
+  options: {
+    noResponseBody: true,
+    onlyRunIf: `={{ $json.headers['x-orbit-token'] === '${runToken}' }}`,
+  },
+};
+wf.connections['Run Now'] = { main: [[{ node: 'Desk Config', type: 'main', index: 0 }]] };
 
 for (const item of wf.nodes.filter((entry) => entry.type === 'n8n-nodes-base.stickyNote')) {
   const content = String(item.parameters.content || '');

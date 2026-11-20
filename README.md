@@ -2,7 +2,7 @@
 
 A local desk for an n8n round that reads ten Kraken pairs against USDC and trades both directions. The model picks its own setups, long or short, with a stop and a target per trade. A hard gate in the workflow may override that. This app turns the workflow on or off and keeps the log.
 
-The app does not start the round. n8n does that itself, every hour at two minutes past, once the workflow is published.
+n8n starts the round itself, every hour at two minutes past, once the workflow is published. **Run now** in the app publishes the workflow and starts a round right away through the `Run Now` webhook, guarded by `ORBIT_RUN_TOKEN`.
 
 ## Start
 
