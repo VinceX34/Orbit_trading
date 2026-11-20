@@ -15,7 +15,7 @@ const mono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "Orbit",
-  description: "The desk for ten Kraken spot lanes, run from n8n.",
+  description: "The desk for ten Kraken pairs, long and short, run from n8n.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

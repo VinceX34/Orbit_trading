@@ -4,7 +4,7 @@ import { unlock } from "./actions";
 export default function LoginPage({ searchParams }: PageProps<"/login">) {
   return (
     <div className="mx-auto flex min-h-[70vh] max-w-md flex-col justify-center">
-      <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-ice">Kraken spot · ten lanes</p>
+      <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-ice">Kraken · long and short</p>
       <div className="orbit-mark mt-2">
         <span className="orbit-ring" aria-hidden="true" />
         <h1 className="font-display text-4xl tracking-tight">Orbit</h1>

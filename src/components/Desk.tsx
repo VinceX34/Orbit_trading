@@ -28,9 +28,22 @@ function formatEur(value: number | null): string {
 }
 
 function tone(action: string | null): string {
-  if (action === "buy") return "text-mint";
-  if (action === "sell") return "text-rose";
+  if (action === "long" || action === "buy") return "text-mint";
+  if (action === "short" || action === "sell") return "text-rose";
+  if (action === "close") return "text-ice";
   return "text-violet";
+}
+
+function plan(coin: CoinLane): string | null {
+  if (coin.stop === null && coin.target === null) return null;
+  const bits: string[] = [];
+  if (coin.side) bits.push(coin.side);
+  if (coin.entry !== null) bits.push(`entry ${coin.entry}`);
+  if (coin.stop !== null) bits.push(`stop ${coin.stop}`);
+  if (coin.target !== null) bits.push(`target ${coin.target}`);
+  if (coin.sizePct !== null) bits.push(`${coin.sizePct}% of desk`);
+  if (coin.pnlPct !== null) bits.push(`now ${formatPct(coin.pnlPct)}`);
+  return bits.join(" · ");
 }
 
 function Tide({ pct }: { pct: number | null }) {
@@ -63,6 +76,9 @@ function Lane({ coin }: { coin: CoinLane }) {
       <p className={`font-mono text-xs uppercase tracking-[0.16em] ${tone(coin.action)}`}>{actionLabel(coin.action)}</p>
       <div>
         {coin.line ? <p className="text-sm leading-6 text-paper-dim">{coin.line}</p> : null}
+        {coin.setup ? <p className="mt-2 text-sm leading-6 text-paper">{coin.setup}</p> : null}
+        {plan(coin) ? <p className="mt-2 font-mono text-[11px] tracking-[0.08em] text-ice">{plan(coin)}</p> : null}
+        {coin.note ? <p className="mt-2 text-sm leading-6 text-violet">{coin.note}</p> : null}
         <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.14em] text-paper-dim">
           {coin.confidence === null ? "—" : coin.confidence.toFixed(2)}
           {coin.blockedByRule ? ` · ${ruleLabels[coin.blockedByRule] || coin.blockedByRule}` : ""}

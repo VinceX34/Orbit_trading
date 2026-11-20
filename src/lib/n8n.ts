@@ -44,6 +44,10 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
+function numberOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
 function decisionFromRun(execution: ExecutionRow): Record<string, unknown> | null {
   const runs = execution.data?.resultData?.runData?.Decision;
   if (!runs?.length) return null;
@@ -77,6 +81,14 @@ function coinsFrom(value: unknown): CoinLane[] {
         confidence: typeof row.confidence === "number" ? row.confidence : null,
         line: typeof row.line === "string" ? row.line : null,
         invalidation: typeof row.invalidation === "string" ? row.invalidation : null,
+        setup: typeof row.setup === "string" ? row.setup : null,
+        side: typeof row.side === "string" ? row.side : null,
+        entry: numberOrNull(row.entry),
+        stop: numberOrNull(row.stop),
+        target: numberOrNull(row.target),
+        sizePct: numberOrNull(row.sizePct),
+        pnlPct: numberOrNull(row.pnlPct),
+        note: typeof row.note === "string" ? row.note : null,
         blockedByRule: typeof row.blockedByRule === "string" ? row.blockedByRule : null,
         order: orderFill(asRecord(row.order)),
         inPosition: typeof row.inPosition === "boolean" ? row.inPosition : null,

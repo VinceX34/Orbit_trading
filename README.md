@@ -1,6 +1,6 @@
 # Orbit
 
-A local desk for an n8n round that looks at ten Kraken spot pairs against euro. The model writes why it buys, sells, or waits on each coin. A hard gate in the workflow may override that. This app turns the workflow on or off and keeps the log.
+A local desk for an n8n round that reads ten Kraken pairs against euro and trades both directions. The model picks its own setups, long or short, with a stop and a target per trade. A hard gate in the workflow may override that. This app turns the workflow on or off and keeps the log.
 
 The app does not start the round. n8n does that itself, every hour at two minutes past, once the workflow is published.
 
@@ -13,29 +13,29 @@ npm run dev
 
 The app listens on http://127.0.0.1:3000. The desk asks for `DESK_PASSWORD` before it opens.
 
-`.env.local` holds the workflow id, that password, and `DATABASE_URL` from the Neon connection on Vercel. Fill in `N8N_API_KEY`. Create the key in n8n under Settings, API. Scopes: `workflow:read`, `workflow:activate`, `execution:list`, `execution:read`, `execution:reveal`.
+`.env.local` holds the workflow id, that password, and `DATABASE_URL` from the Neon connection on Vercel. Fill in `N8N_API_KEY`. Create the key in n8n under Settings, API. Scopes: `workflow:read`, `workflow:update`, `workflow:activate`, `execution:list`, `execution:read`, `execution:reveal`.
 
 ## What you still connect
 
 The flow is named **Orbit** and stays unpublished until the switch flips: [Orbit](https://vincex34.app.n8n.cloud/workflow/BqMqaNPVxkVTT3Tt).
 
-The **Orbit** node uses the credential **OpenAi account**, model `gpt-5.4`. Without a working OpenAI key the round writes `model_offline` and no order goes out.
+The **Orbit** node uses the credential **OpenAi account**, model `gpt-5.6-luna`. Without a working OpenAI key the round writes `model_offline` and no order goes out.
 
-Kraken, later, as two n8n variables. The names must be exact:
+The Kraken key and secret live in the n8n data table `orbit_kraken`. Permissions on that key: Query Funds, Query Open Orders & Trades, Query Closed Orders & Trades, Create & Modify Orders, Cancel/Close Orders. No Withdraw. Shorts run on Kraken margin with the same key, so margin trading must be enabled on the account.
 
-- `KRAKEN_API_KEY`
-- `KRAKEN_API_SECRET`
+Without the keys Orbit only reads the public prices and writes wait. No order goes out.
 
-Permissions on that key: Query Funds, Query Open Orders & Trades, Query Closed Orders & Trades, Create & Modify Orders, Cancel/Close Orders. No Withdraw.
+## The rules
 
-Without those variables Orbit only reads the public prices and writes wait. No order goes out.
+BTC, ETH, SOL, XRP, ADA, DOGE, LINK, AVAX, DOT and LTC, all against euro. All numbers below live on the Desk Config node.
 
-## The ten lanes
+- At most two positions at once, each at most 45% of desk equity. Desk equity is free euro plus Orbit's own positions, not the rest of the Kraken account.
+- A long is a spot buy. A short is a margin sell at 2x leverage.
+- Every opening carries a real stop-loss order on Kraken, at most 1.5% and at least 0.3% from the price.
+- The target must pay the round-trip fee. The desk closes the position in the first round after the price touches it.
+- Conviction below 0.62 opens nothing.
+- Above +1% or below −0.5% on the day, no new position. Closing is always allowed.
 
-BTC, ETH, SOL, XRP, ADA, DOGE, LINK, AVAX, DOT and LTC, all against euro. The list lives on the Desk Config node.
+## Changing the workflow
 
-At most one position per coin, and only volume Orbit bought itself. A buy is at most 15 euro. Balance that was already on Kraken stays put.
-
-Plus 1% on this desk's equity is the line. Above it, no new buy. Below −0.5%, no new buy either. An open position may still be closed. Equity is free euro plus Orbit's own holdings, not the whole Kraken account.
-
-A first hour can deploy up to ten times 15 euro if the gate lets every buy through.
+`n8n/orbit.js` is the source of the workflow code. `node n8n/sync.mjs` writes the code, the prompt and Desk Config into the live workflow without touching the model choice or the publish switch. `--dry` only checks that everything parses.

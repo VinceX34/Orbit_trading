@@ -6,7 +6,7 @@ export default function DeskLayout({ children }: LayoutProps<"/">) {
     <>
       <header className="flex items-end justify-between gap-6 border-b border-[var(--line)] pb-5">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-ice">Kraken spot · ten lanes</p>
+          <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-ice">Kraken · long and short</p>
           <div className="orbit-mark mt-2">
             <span className="orbit-ring" aria-hidden="true" />
             <Link href="/" className="font-display text-4xl tracking-tight">

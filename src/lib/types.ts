@@ -14,6 +14,14 @@ export type CoinLane = {
   confidence: number | null;
   line: string | null;
   invalidation: string | null;
+  setup: string | null;
+  side: string | null;
+  entry: number | null;
+  stop: number | null;
+  target: number | null;
+  sizePct: number | null;
+  pnlPct: number | null;
+  note: string | null;
   blockedByRule: string | null;
   order: OrderFill | null;
   inPosition: boolean | null;
