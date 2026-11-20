@@ -34,7 +34,7 @@ BTC, ETH, SOL, XRP, ADA, DOGE, LINK, AVAX, DOT and LTC, all against euro. All nu
 - Every opening carries a real stop-loss order on Kraken, at most 1.5% and at least 0.3% from the price.
 - The target must pay the round-trip fee. The desk closes the position in the first round after the price touches it.
 - Conviction below 0.62 opens nothing.
-- Above +1% or below −0.5% on the day, no new position. Closing is always allowed.
+- Above +1% or below −3% on the day, no new position. Closing is always allowed.
 
 ## Changing the workflow
 

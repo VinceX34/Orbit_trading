@@ -22,7 +22,7 @@ const deskValues = {
   maxSizePct: 45,
   maxStopPct: 1.5,
   minStopPct: 0.3,
-  dailyLossPct: -0.5,
+  dailyLossPct: -3,
   dailyTargetPct: 1,
   minConfidence: 0.62,
   takerFeePct: 0.4,

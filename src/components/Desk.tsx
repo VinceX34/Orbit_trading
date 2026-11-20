@@ -47,14 +47,14 @@ function plan(coin: CoinLane): string | null {
 }
 
 function Tide({ pct }: { pct: number | null }) {
-  const min = -0.5;
+  const min = -3;
   const max = 1;
   const clamped = pct === null ? null : Math.min(max, Math.max(min, pct));
   const position = clamped === null ? 50 : ((clamped - min) / (max - min)) * 100;
   return (
     <div>
       <div className="flex justify-between font-mono text-[11px] uppercase tracking-[0.16em] text-paper-dim">
-        <span>−0.5%</span>
+        <span>−3%</span>
         <span>the line +1%</span>
       </div>
       <div className="relative mt-3 h-2 rounded-full bg-ink">
