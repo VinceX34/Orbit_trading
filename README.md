@@ -13,6 +13,8 @@ npm run dev
 
 The app listens on http://127.0.0.1:3000. The desk asks for `DESK_PASSWORD` before it opens.
 
+The desk is split by exchange. A flow is one n8n workflow linked to one exchange, and each flow has its own on/off switch. Orbit on Kraken is the first. Another broker is another exchange with its own flow. Dashboard, open positions, analysis and the trade log are separate pages. Each round is an analysis id (`A-001`). Each fill is a trade number, linked to the round that opened it and the round that closed it. Light, dark and system live under Settings, in this browser.
+
 `.env.local` holds the workflow id, that password, and `DATABASE_URL` from the Neon connection on Vercel. Fill in `N8N_API_KEY`. Create the key in n8n under Settings, API. Scopes: `workflow:read`, `workflow:update`, `workflow:activate`, `execution:list`, `execution:read`, `execution:reveal`.
 
 ## What you still connect

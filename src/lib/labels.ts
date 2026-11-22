@@ -1,5 +1,5 @@
 export const ruleLabels: Record<string, string> = {
-  missing_credentials: "Kraken keys are missing",
+  missing_credentials: "Exchange keys are missing",
   model_offline: "OpenAI did not answer",
   daily_loss: "The day loss limit blocked a new trade",
   target_reached: "The +1% day line is reached",
@@ -26,7 +26,7 @@ export const ruleLabels: Record<string, string> = {
   stop_missing: "Stop was gone, the desk closed it",
   account_unreadable: "The account could not be read",
   unreadable: "The journal came back unreadable",
-  exchange_rejected: "Kraken rejected the order",
+  exchange_rejected: "The exchange rejected the order",
 };
 
 const setupLabels: Record<string, string> = {

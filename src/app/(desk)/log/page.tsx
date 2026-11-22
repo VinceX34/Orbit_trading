@@ -1,5 +1,5 @@
-import { Desk } from "@/components/Desk";
+import { redirect } from "next/navigation";
 
 export default function LogPage() {
-  return <Desk view="log" />;
+  redirect("/analysis");
 }

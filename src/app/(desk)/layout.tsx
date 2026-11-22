@@ -1,34 +1,13 @@
-import Link from "next/link";
-import { lock } from "../login/actions";
+import { Suspense } from "react";
+import { DeskProvider } from "@/components/desk-provider";
+import { Shell } from "@/components/sidebar";
 
 export default function DeskLayout({ children }: LayoutProps<"/">) {
   return (
-    <>
-      <header className="flex items-end justify-between gap-6 border-b border-[var(--line)] pb-5">
-        <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-ice">Kraken · long and short</p>
-          <div className="orbit-mark mt-2">
-            <span className="orbit-ring" aria-hidden="true" />
-            <Link href="/" className="font-display text-4xl tracking-tight">
-              Orbit
-            </Link>
-          </div>
-        </div>
-        <nav className="flex items-center gap-5 font-mono text-xs uppercase tracking-[0.18em] text-paper-dim">
-          <Link href="/" className="hover:text-paper">
-            Desk
-          </Link>
-          <Link href="/log" className="hover:text-paper">
-            Log
-          </Link>
-          <form action={lock}>
-            <button type="submit" className="hover:text-paper">
-              Lock
-            </button>
-          </form>
-        </nav>
-      </header>
-      <main className="flex-1 py-8">{children}</main>
-    </>
+    <Suspense fallback={<div className="p-6 text-sm text-muted">Loading the desk…</div>}>
+      <DeskProvider>
+        <Shell>{children}</Shell>
+      </DeskProvider>
+    </Suspense>
   );
 }

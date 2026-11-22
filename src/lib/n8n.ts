@@ -1,5 +1,7 @@
-import type { CoinLane, Decision, DeskState } from "./types";
-import { databaseUrl, listDecisions, saveDecision } from "./store";
+import { assignTradeNumbers, deriveDesk } from "./book";
+import { defaultFlow, exchangeById, flowById, flows } from "./flows";
+import { assignAnalysisNumbers, databaseUrl, listDecisions, listTrades, saveDecision, saveTrades } from "./store";
+import type { CoinLane, Decision, DeskState, FlowState, StaticBook, StaticHistory, StaticPending, StaticPosition } from "./types";
 
 type ExecutionRow = {
   id?: string | number;
@@ -99,9 +101,11 @@ function coinsFrom(value: unknown): CoinLane[] {
   });
 }
 
-function toDecision(execution: ExecutionRow, json: Record<string, unknown> | null): Decision {
+function toDecision(execution: ExecutionRow, json: Record<string, unknown> | null, flowId: string): Decision {
   return {
     executionId: String(execution.id ?? ""),
+    analysisNo: null,
+    flowId,
     startedAt: execution.startedAt ?? null,
     status: execution.status ?? "unknown",
     pair: typeof json?.pair === "string" ? json.pair : null,
@@ -124,7 +128,77 @@ function toDecision(execution: ExecutionRow, json: Record<string, unknown> | nul
   };
 }
 
-async function syncExecutions(workflowId: string): Promise<string | null> {
+function textOrUndefined(value: unknown): string | undefined {
+  return typeof value === "string" && value ? value : undefined;
+}
+
+function bookFrom(workflow: Record<string, unknown>): StaticBook {
+  let data: unknown = workflow.staticData;
+  if (typeof data === "string") {
+    try {
+      data = JSON.parse(data);
+    } catch {
+      data = null;
+    }
+  }
+  const globalData = asRecord(asRecord(data)?.global) ?? {};
+  const positions: Record<string, StaticPosition> = {};
+  for (const [pair, value] of Object.entries(asRecord(globalData.positions) ?? {})) {
+    const row = asRecord(value);
+    if (!row) continue;
+    positions[pair] = {
+      side: textOrUndefined(row.side),
+      volume: numberOrNull(row.volume) ?? undefined,
+      entry: numberOrNull(row.entry) ?? undefined,
+      stop: numberOrNull(row.stop) ?? undefined,
+      target: numberOrNull(row.target) ?? undefined,
+      openedAt: numberOrNull(row.openedAt) ?? undefined,
+      txid: textOrUndefined(row.txid),
+      setup: textOrUndefined(row.setup),
+      setupType: textOrUndefined(row.setupType),
+    };
+  }
+  const pending: Record<string, StaticPending> = {};
+  for (const [pair, value] of Object.entries(asRecord(globalData.pending) ?? {})) {
+    const row = asRecord(value);
+    if (!row) continue;
+    pending[pair] = {
+      txid: textOrUndefined(row.txid),
+      side: textOrUndefined(row.side),
+      limit: numberOrNull(row.limit) ?? undefined,
+      volume: numberOrNull(row.volume) ?? undefined,
+      stop: numberOrNull(row.stop) ?? undefined,
+      target: numberOrNull(row.target) ?? undefined,
+      placedAt: numberOrNull(row.placedAt) ?? undefined,
+      expireAt: numberOrNull(row.expireAt) ?? undefined,
+      setup: textOrUndefined(row.setup),
+      setupType: textOrUndefined(row.setupType),
+      cancelled: row.cancelled === true,
+    };
+  }
+  const history: StaticHistory[] = Array.isArray(globalData.history)
+    ? globalData.history.flatMap((item) => {
+        const row = asRecord(item);
+        if (!row) return [];
+        return [
+          {
+            symbol: textOrUndefined(row.symbol),
+            side: textOrUndefined(row.side),
+            setupType: textOrUndefined(row.setupType),
+            grossPct: numberOrNull(row.grossPct) ?? undefined,
+            netPct: numberOrNull(row.netPct) ?? undefined,
+            r: numberOrNull(row.r),
+            hours: numberOrNull(row.hours) ?? undefined,
+            how: textOrUndefined(row.how),
+            at: numberOrNull(row.at) ?? undefined,
+          },
+        ];
+      })
+    : [];
+  return { positions, pending, history };
+}
+
+async function syncExecutions(workflowId: string, flowId: string): Promise<string | null> {
   const query = new URLSearchParams({
     workflowId,
     limit: "20",
@@ -136,14 +210,12 @@ async function syncExecutions(workflowId: string): Promise<string | null> {
     query.delete("redactExecutionData");
     response = await n8n(`/executions?${query.toString()}`);
   }
-  if (!response.ok) {
-    return `Could not fetch executions (${response.status}).`;
-  }
+  if (!response.ok) return `Could not fetch executions (${response.status}).`;
   const body = (await response.json()) as { data?: ExecutionRow[] };
   for (const execution of body.data ?? []) {
     if (!execution.id) continue;
     const json = decisionFromRun(execution);
-    const decision = toDecision(execution, json);
+    const decision = toDecision(execution, json, flowId);
     if (!decision.reason && !decision.action && decision.coins.length === 0 && decision.status === "success") continue;
     await saveDecision(decision, json ?? { status: decision.status, error: decision.reason });
   }
@@ -155,51 +227,129 @@ function publishedFrom(workflow: Record<string, unknown>): boolean {
   return Boolean(workflow.activeVersionId);
 }
 
-export async function loadDesk(): Promise<DeskState> {
-  const { workflowId, missing } = config();
-  const base: DeskState = {
+function blank(): DeskState {
+  const { missing } = config();
+  const flowCards: FlowState[] = flows.map((flow) => {
+    const exchange = exchangeById(flow.exchangeId);
+    return {
+      id: flow.id,
+      name: flow.name,
+      exchangeId: flow.exchangeId,
+      exchangeName: exchange?.name || flow.exchangeId,
+      quote: exchange?.quote || "USDC",
+      engine: flow.engine,
+      summary: flow.summary,
+      workflowId: (process.env[flow.workflowIdEnv] || "").trim() || null,
+      published: null,
+      equityQuote: null,
+      dayPnlPct: null,
+      asOf: null,
+    };
+  });
+  return {
     configured: missing.length === 0,
     missing,
-    published: null,
-    workflowName: null,
-    workflowId: workflowId || null,
     error: null,
-    decisions: [],
+    exchanges: flowCards.map((flow) => ({ id: flow.exchangeId, name: flow.exchangeName, quote: flow.quote })).filter((exchange, index, list) => list.findIndex((item) => item.id === exchange.id) === index),
+    flows: flowCards,
+    equityQuote: null,
+    dayPnlPct: null,
+    asOf: null,
+    positions: [],
+    resting: [],
+    analyses: [],
+    trades: [],
   };
-  if (missing.length) {
-    base.decisions = await listDecisions();
-    return base;
+}
+
+export async function loadDesk(): Promise<DeskState> {
+  const state = blank();
+  const books = new Map<string, StaticBook | null>();
+  if (state.configured) {
+    for (const flow of flows) {
+      const workflowId = process.env[flow.workflowIdEnv] || "";
+      try {
+        const workflowResponse = await n8n(`/workflows/${workflowId}`);
+        if (!workflowResponse.ok) {
+          state.error = `Could not fetch ${flow.name} (${workflowResponse.status}). Check the API key and the workflow id.`;
+          books.set(flow.id, null);
+          continue;
+        }
+        const workflow = (await workflowResponse.json()) as Record<string, unknown>;
+        const card = state.flows.find((item) => item.id === flow.id);
+        if (card) card.published = publishedFrom(workflow);
+        books.set(flow.id, bookFrom(workflow));
+        const syncError = await syncExecutions(workflowId, flow.id);
+        if (syncError) state.error = syncError;
+      } catch (error) {
+        state.error = error instanceof Error ? error.message : "Unknown error talking to n8n.";
+        books.set(flow.id, null);
+      }
+    }
   }
 
   try {
-    const workflowResponse = await n8n(`/workflows/${workflowId}`);
-    if (!workflowResponse.ok) {
-      base.error = `Could not fetch the workflow (${workflowResponse.status}). Check the API key and the workflow id.`;
-      base.decisions = await listDecisions();
-      return base;
-    }
-    const workflow = (await workflowResponse.json()) as Record<string, unknown>;
-    base.published = publishedFrom(workflow);
-    base.workflowName = typeof workflow.name === "string" ? workflow.name : null;
-    const syncError = await syncExecutions(workflowId);
-    base.error = syncError;
-    base.decisions = await listDecisions();
-    return base;
+    await assignAnalysisNumbers();
+    state.analyses = await listDecisions();
   } catch (error) {
-    base.error = error instanceof Error ? error.message : "Unknown error talking to n8n.";
-    base.decisions = await listDecisions();
-    return base;
+    state.error = state.error || (error instanceof Error ? error.message : "Could not read the log.");
   }
+
+  const drafts = [];
+  for (const flow of flows) {
+    const slice = state.analyses.filter((item) => (item.flowId || defaultFlow().id) === flow.id);
+    const derived = deriveDesk({ flow, decisions: slice, book: books.get(flow.id) ?? null });
+    drafts.push(...derived.trades);
+    state.positions.push(...derived.positions);
+    state.resting.push(...derived.resting);
+    const card = state.flows.find((item) => item.id === flow.id);
+    const withEquity = slice.find((item) => item.equityQuote !== null);
+    if (card && withEquity) {
+      card.equityQuote = withEquity.equityQuote;
+      card.dayPnlPct = withEquity.dayPnlPct;
+      card.asOf = withEquity.startedAt;
+    }
+  }
+
+  let existing: { id: string; tradeNo: number }[] = [];
+  try {
+    existing = (await listTrades()).map((trade) => ({ id: trade.id, tradeNo: trade.tradeNo }));
+  } catch {
+    existing = [];
+  }
+  const trades = assignTradeNumbers(drafts, existing);
+  const numbers = new Map(trades.map((trade) => [trade.id, trade.tradeNo]));
+  for (const position of state.positions) position.tradeNo = numbers.get(position.tradeId) ?? null;
+  try {
+    await saveTrades(trades);
+  } catch (error) {
+    state.error = state.error || (error instanceof Error ? error.message : "Could not save the trade log.");
+  }
+
+  state.trades = [...trades].sort((a, b) => b.tradeNo - a.tradeNo);
+  const equities = state.flows.map((flow) => flow.equityQuote).filter((value): value is number => value !== null);
+  state.equityQuote = equities.length ? equities.reduce((sum, value) => sum + value, 0) : null;
+  const newest = [...state.flows].filter((flow) => flow.asOf).sort((a, b) => (b.asOf || "").localeCompare(a.asOf || ""))[0];
+  state.dayPnlPct = newest?.dayPnlPct ?? null;
+  state.asOf = newest?.asOf ?? state.analyses[0]?.startedAt ?? null;
+  return state;
 }
 
-export async function setPublished(active: boolean): Promise<DeskState> {
-  const { workflowId, missing } = config();
+export async function setFlowPublished(flowId: string, active: boolean): Promise<DeskState> {
+  const flow = flowById(flowId);
+  const { missing } = config();
+  if (!flow) {
+    const state = await loadDesk();
+    state.error = "Unknown flow.";
+    return state;
+  }
   if (missing.length) {
     const state = await loadDesk();
     state.error = "Fill in the missing values in .env.local first.";
     return state;
   }
 
+  const workflowId = process.env[flow.workflowIdEnv] || "";
   const path = active ? "publish" : "unpublish";
   let response = await n8n(`/workflows/${workflowId}/${path}`, { method: "POST", body: "{}" });
   if (response.status === 404 || response.status === 405) {
@@ -208,34 +358,36 @@ export async function setPublished(active: boolean): Promise<DeskState> {
   }
   if (!response.ok) {
     const state = await loadDesk();
-    state.error = `Could not switch the workflow (${response.status}). The API key needs workflow:activate.`;
+    state.error = `Could not switch ${flow.name} (${response.status}). The API key needs workflow:activate.`;
     return state;
   }
   return loadDesk();
 }
 
-export async function runNow(): Promise<DeskState> {
+export async function runFlow(flowId: string): Promise<DeskState> {
+  const flow = flowById(flowId);
   const { baseUrl, missing } = config();
-  const token = process.env.ORBIT_RUN_TOKEN || "";
-  if (missing.length || !token) {
+  const token = flow ? process.env[flow.tokenEnv] || "" : "";
+  if (!flow || missing.length || !token) {
     const state = await loadDesk();
-    state.error = token ? "Fill in the missing values in .env.local first." : "ORBIT_RUN_TOKEN is missing.";
+    state.error = !flow ? "Unknown flow." : token ? "Fill in the missing values in .env.local first." : `${flow.tokenEnv} is missing.`;
     return state;
   }
 
   const before = await loadDesk();
   if (before.error) return before;
-  if (!before.published) {
-    const switched = await setPublished(true);
+  const card = before.flows.find((item) => item.id === flow.id);
+  if (!card?.published) {
+    const switched = await setFlowPublished(flow.id, true);
     if (switched.error) return switched;
   }
 
   let status = 0;
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    const response = await fetch(`${baseUrl}/webhook/orbit-run-now`, {
+    const response = await fetch(`${baseUrl}/webhook/${flow.webhookPath}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-orbit-token": token },
-      body: JSON.stringify({ source: "desk" }),
+      body: JSON.stringify({ source: "desk", flowId: flow.id }),
       cache: "no-store",
     });
     status = response.status;

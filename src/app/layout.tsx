@@ -1,29 +1,30 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Outfit } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
+import { themeBoot } from "@/lib/theme";
 import "./globals.css";
 
-const display = Outfit({
+const sans = Geist({
   subsets: ["latin"],
-  variable: "--font-display",
+  variable: "--font-sans",
 });
 
-const mono = IBM_Plex_Mono({
+const mono = Geist_Mono({
   subsets: ["latin"],
-  weight: ["400", "500"],
   variable: "--font-mono",
 });
 
 export const metadata: Metadata = {
   title: "Orbit",
-  description: "The desk for ten Kraken pairs, long and short, run from n8n.",
+  description: "The desk for exchange flows, positions, analyses and the trade log.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${display.variable} ${mono.variable} h-full antialiased`}>
-      <body className="min-h-full">
-        <div className="relative mx-auto flex min-h-screen w-full max-w-6xl flex-col px-5 py-6 sm:px-8">{children}</div>
-      </body>
+    <html lang="en" suppressHydrationWarning className={`${sans.variable} ${mono.variable} h-full antialiased`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBoot }} />
+      </head>
+      <body className="min-h-full">{children}</body>
     </html>
   );
 }
