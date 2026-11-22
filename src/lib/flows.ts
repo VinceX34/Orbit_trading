@@ -13,6 +13,7 @@ export type TradeFlow = {
   webhookPath: string;
   tokenEnv: "ORBIT_RUN_TOKEN";
   summary: string;
+  maxPositions: number;
 };
 
 export const exchanges: Exchange[] = [{ id: "kraken", name: "Kraken", quote: "USDC" }];
@@ -27,6 +28,7 @@ export const flows: TradeFlow[] = [
     webhookPath: "orbit-run-now",
     tokenEnv: "ORBIT_RUN_TOKEN",
     summary: "Hourly book review and hunt on ten USDC pairs.",
+    maxPositions: 3,
   },
 ];
 

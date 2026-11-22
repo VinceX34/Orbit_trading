@@ -53,7 +53,7 @@ export function SettingsPage() {
                   {exchange.name} <span className="font-normal text-muted">· {exchange.quote}</span>
                 </p>
                 <p className="mt-1 text-xs text-muted">
-                  {attached.length ? attached.map((flow) => flow.name).join(", ") : "No flow yet"}
+                  {attached.length ? attached.map((flow) => `${flow.name}, at most ${flow.maxPositions} open`).join(", ") : "No flow yet"}
                   {" · "}
                   <Link href="/flows" className="text-accent hover:underline">
                     Flows

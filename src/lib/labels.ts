@@ -6,7 +6,7 @@ export const ruleLabels: Record<string, string> = {
   already_in_position: "This coin already holds a position",
   already_flat: "There is no position to close",
   order_pending: "A limit order is already resting here",
-  max_positions: "Two positions are already taken",
+  max_positions: "The book is already full",
   max_size: "Free USDC does not cover this trade",
   no_short: "This pair cannot be shorted, long only",
   below_minimum: "Below Kraken's minimum order size",

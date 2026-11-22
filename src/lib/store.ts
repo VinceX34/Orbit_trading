@@ -1,5 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { defaultFlow } from "./flows";
+import { parsePositionLimit } from "./flow-limit";
 import type { CoinLane, Decision, OrderFill, Trade } from "./types";
 
 type Sql = ReturnType<typeof neon>;
@@ -57,6 +58,12 @@ async function ready(): Promise<void> {
       await sql.query(`ALTER TABLE decisions ADD COLUMN IF NOT EXISTS analysis_no INTEGER`);
       await sql.query(`ALTER TABLE decisions ADD COLUMN IF NOT EXISTS flow_id TEXT`);
       await sql.query(`UPDATE decisions SET flow_id = $1 WHERE flow_id IS NULL`, [defaultFlow().id]);
+      await sql.query(
+        `CREATE TABLE IF NOT EXISTS flow_settings (
+          flow_id TEXT PRIMARY KEY,
+          max_positions INTEGER NOT NULL
+        )`,
+      );
       await sql.query(
         `CREATE TABLE IF NOT EXISTS trades (
           id TEXT PRIMARY KEY,
@@ -270,6 +277,40 @@ function tradeFrom(row: Row): Trade {
     closeAnalysisId: row.close_analysis_id ? String(row.close_analysis_id) : null,
     txid: row.txid ? String(row.txid) : null,
   };
+}
+
+async function ensureFlowSettings(): Promise<void> {
+  await ready();
+  await client().query(
+    `CREATE TABLE IF NOT EXISTS flow_settings (
+      flow_id TEXT PRIMARY KEY,
+      max_positions INTEGER NOT NULL
+    )`,
+  );
+}
+
+export async function flowLimit(flowId: string, fallback: number): Promise<number> {
+  if (!databaseUrl()) return fallback;
+  await ensureFlowSettings();
+  const existing = rowsOf(await client().query(`SELECT max_positions FROM flow_settings WHERE flow_id = $1`, [flowId]))[0];
+  const parsed = parsePositionLimit(existing?.max_positions);
+  if (parsed !== null) return parsed;
+  await client().query(
+    `INSERT INTO flow_settings (flow_id, max_positions) VALUES ($1, $2)
+     ON CONFLICT (flow_id) DO NOTHING`,
+    [flowId, fallback],
+  );
+  return fallback;
+}
+
+export async function saveFlowLimit(flowId: string, maxPositions: number): Promise<void> {
+  if (!databaseUrl()) return;
+  await ensureFlowSettings();
+  await client().query(
+    `INSERT INTO flow_settings (flow_id, max_positions) VALUES ($1, $2)
+     ON CONFLICT (flow_id) DO UPDATE SET max_positions = excluded.max_positions`,
+    [flowId, maxPositions],
+  );
 }
 
 export async function listTrades(): Promise<Trade[]> {

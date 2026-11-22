@@ -9,6 +9,7 @@ type DeskApi = {
   busyFlow: string | null;
   setFlow: (flowId: string, active: boolean) => Promise<void>;
   runFlow: (flowId: string) => Promise<void>;
+  setLimit: (flowId: string, maxPositions: number) => Promise<void>;
 };
 
 const DeskContext = createContext<DeskApi | null>(null);
@@ -40,7 +41,7 @@ export function DeskProvider({ children }: { children: ReactNode }) {
     };
   }, [refresh, router]);
 
-  async function send(flowId: string, body: { active?: boolean; run?: boolean }) {
+  async function send(flowId: string, body: { active?: boolean; run?: boolean; maxPositions?: number }) {
     if (busyFlow) return;
     setBusyFlow(flowId);
     const response = await fetch("/api/desk", {
@@ -62,6 +63,7 @@ export function DeskProvider({ children }: { children: ReactNode }) {
     busyFlow,
     setFlow: (flowId, active) => send(flowId, { active }),
     runFlow: (flowId) => send(flowId, { run: true }),
+    setLimit: (flowId, maxPositions) => send(flowId, { maxPositions }),
   };
 
   return <DeskContext.Provider value={api}>{children}</DeskContext.Provider>;

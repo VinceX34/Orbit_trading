@@ -1,7 +1,44 @@
 "use client";
 
+import { useState } from "react";
 import { useDesk } from "@/components/desk-provider";
 import { PageTitle, Switch } from "@/components/ui";
+import { positionLimit } from "@/lib/flow-limit";
+
+function OpenLimit({ flowId, value, disabled }: { flowId: string; value: number; disabled: boolean }) {
+  const { setLimit, busyFlow } = useDesk();
+  const [draft, setDraft] = useState(String(value));
+  const parsed = Number(draft);
+  const ready = Number.isInteger(parsed) && parsed >= positionLimit.min && parsed <= positionLimit.max && parsed !== value;
+  return (
+    <form
+      className="mt-3 flex flex-wrap items-center gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (ready) void setLimit(flowId, parsed);
+      }}
+    >
+      <label className="text-xs text-muted" htmlFor={`open-${flowId}`}>
+        Open at once
+      </label>
+      <input
+        id={`open-${flowId}`}
+        type="number"
+        min={positionLimit.min}
+        max={positionLimit.max}
+        step={1}
+        value={draft}
+        disabled={disabled}
+        onChange={(event) => setDraft(event.target.value)}
+        className="w-16 rounded-md border border-line bg-bg px-2 py-1 font-mono text-sm"
+      />
+      <button type="submit" disabled={disabled || busyFlow === flowId || !ready} className="rounded-md border border-line px-3 py-1.5 text-sm hover:bg-sunken disabled:opacity-40">
+        Save
+      </button>
+      <span className="text-xs text-muted">Resting orders count. The model reads this same number.</span>
+    </form>
+  );
+}
 
 export function FlowList({ compact }: { compact?: boolean }) {
   const { state, busyFlow, setFlow, runFlow } = useDesk();
@@ -33,6 +70,7 @@ export function FlowList({ compact }: { compact?: boolean }) {
                       <p className="mt-1 text-sm leading-6 text-muted">{flow.summary}</p>
                       <p className="mt-1 text-xs text-muted">
                         {flow.published === null ? "Not connected yet." : on ? "On. The next hour runs." : "Off. The next hour does not run."}
+                        {compact ? ` At most ${flow.maxPositions} open.` : ""}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -40,6 +78,7 @@ export function FlowList({ compact }: { compact?: boolean }) {
                       <Switch on={on} disabled={!state.configured || busy || flow.published === null} label={`${flow.name} ${on ? "on" : "off"}`} onClick={() => void setFlow(flow.id, !on)} />
                     </div>
                   </div>
+                  {compact ? null : <OpenLimit key={`${flow.id}-${flow.maxPositions}`} flowId={flow.id} value={flow.maxPositions} disabled={!state.configured || busy} />}
                   {compact ? null : (
                     <button
                       type="button"
@@ -65,7 +104,7 @@ export function FlowsPage() {
     <>
       <PageTitle
         title="Flows"
-        lede="A flow is an n8n workflow tied to one exchange. Each one has its own switch. Another broker later is another exchange, with its own flow."
+        lede="A flow is an n8n workflow tied to one exchange. Each one has its own switch and its own limit on how many positions may be open. That limit is what the model is told, and what the desk enforces."
       />
       <FlowList />
     </>

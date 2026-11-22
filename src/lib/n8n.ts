@@ -1,6 +1,7 @@
 import { assignTradeNumbers, deriveDesk } from "./book";
-import { defaultFlow, exchangeById, flowById, flows } from "./flows";
-import { assignAnalysisNumbers, databaseUrl, listDecisions, listTrades, saveDecision, saveTrades } from "./store";
+import { applyPositionLimit, parsePositionLimit, readPositionLimit } from "./flow-limit";
+import { defaultFlow, exchangeById, flowById, flows, type TradeFlow } from "./flows";
+import { assignAnalysisNumbers, databaseUrl, flowLimit, listDecisions, listTrades, saveDecision, saveFlowLimit, saveTrades } from "./store";
 import type { CoinLane, Decision, DeskState, FlowState, StaticBook, StaticHistory, StaticPending, StaticPosition } from "./types";
 
 type ExecutionRow = {
@@ -241,6 +242,7 @@ function blank(): DeskState {
       summary: flow.summary,
       workflowId: (process.env[flow.workflowIdEnv] || "").trim() || null,
       published: null,
+      maxPositions: flow.maxPositions,
       equityQuote: null,
       dayPnlPct: null,
       asOf: null,
@@ -279,6 +281,8 @@ export async function loadDesk(): Promise<DeskState> {
         const card = state.flows.find((item) => item.id === flow.id);
         if (card) card.published = publishedFrom(workflow);
         books.set(flow.id, bookFrom(workflow));
+        const limitError = await alignLimit(flow, workflow, card);
+        if (limitError) state.error = state.error || limitError;
         const syncError = await syncExecutions(workflowId, flow.id);
         if (syncError) state.error = syncError;
       } catch (error) {
@@ -333,6 +337,80 @@ export async function loadDesk(): Promise<DeskState> {
   state.dayPnlPct = newest?.dayPnlPct ?? null;
   state.asOf = newest?.asOf ?? state.analyses[0]?.startedAt ?? null;
   return state;
+}
+
+async function writeWorkflow(workflowId: string, workflow: Record<string, unknown>): Promise<Response> {
+  const settings = asRecord(workflow.settings);
+  return n8n(`/workflows/${workflowId}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      name: workflow.name,
+      nodes: workflow.nodes,
+      connections: workflow.connections,
+      settings: {
+        executionOrder: typeof settings?.executionOrder === "string" ? settings.executionOrder : "v1",
+        availableInMCP: settings?.availableInMCP !== false,
+      },
+    }),
+  });
+}
+
+async function alignLimit(flow: TradeFlow, workflow: Record<string, unknown>, card: FlowState | undefined, override?: number): Promise<string | null> {
+  const live = readPositionLimit(workflow);
+  const wanted = override ?? (databaseUrl() ? await flowLimit(flow.id, flow.maxPositions) : live ?? flow.maxPositions);
+  if (card) card.maxPositions = wanted;
+  const persist = override !== undefined || Boolean(databaseUrl());
+  if (!persist || live === null) return live === null && persist ? `${flow.name} has no position limit on its desk config.` : null;
+  const applied = applyPositionLimit(workflow, wanted);
+  if (!applied.found) return `${flow.name} has no position limit on its desk config.`;
+  if (!applied.changed) return null;
+  const wasOn = publishedFrom(workflow);
+  const workflowId = process.env[flow.workflowIdEnv] || "";
+  const put = await writeWorkflow(workflowId, workflow);
+  if (!put.ok) {
+    if (card && live !== null) card.maxPositions = live;
+    return `Could not set the position limit on ${flow.name} (${put.status}).`;
+  }
+  if (!wasOn) return null;
+  let response = await n8n(`/workflows/${workflowId}/publish`, { method: "POST", body: "{}" });
+  if (response.status === 404 || response.status === 405) {
+    response = await n8n(`/workflows/${workflowId}/activate`, { method: "POST", body: "{}" });
+  }
+  if (!response.ok) return `The position limit was saved, but the published flow did not update (${response.status}).`;
+  return null;
+}
+
+export async function setFlowLimit(flowId: string, raw: unknown): Promise<DeskState> {
+  const flow = flowById(flowId);
+  const maxPositions = parsePositionLimit(raw);
+  if (!flow || maxPositions === null) {
+    const state = await loadDesk();
+    state.error = !flow ? "Unknown flow." : "Open positions must be a whole number from 1 to 5.";
+    return state;
+  }
+  const { missing } = config();
+  if (missing.length) {
+    const state = await loadDesk();
+    state.error = "Fill in the missing values in .env.local first.";
+    return state;
+  }
+  await saveFlowLimit(flow.id, maxPositions);
+  if (!databaseUrl()) {
+    const response = await n8n(`/workflows/${process.env[flow.workflowIdEnv] || ""}`);
+    if (!response.ok) {
+      const state = await loadDesk();
+      state.error = `Could not fetch ${flow.name} (${response.status}).`;
+      return state;
+    }
+    const workflow = (await response.json()) as Record<string, unknown>;
+    const error = await alignLimit(flow, workflow, undefined, maxPositions);
+    const state = await loadDesk();
+    if (error) state.error = error;
+    const card = state.flows.find((item) => item.id === flow.id);
+    if (card && !error) card.maxPositions = maxPositions;
+    return state;
+  }
+  return loadDesk();
 }
 
 export async function setFlowPublished(flowId: string, active: boolean): Promise<DeskState> {

@@ -18,7 +18,7 @@ const pairQuery = 'XBTUSDC,ETHUSDC,SOLUSDC,XRPUSDC,ADAUSDC,XDGUSDC,LINKUSDC,AVAX
 const deskValues = {
   lanes: lanesJson,
   pairQuery: pairQuery,
-  maxPositions: 2,
+  maxPositions: 3,
   maxSizePct: 45,
   riskPerTradePct: 2,
   minStopAtr: 1.2,
@@ -60,7 +60,7 @@ For a resting limit order that has not filled: hold leaves it, close cancels it.
 The desk also manages by rule, with or without you: at plus one R the stop goes to the entry, from plus one and a half R it trails behind the best price, a touched target is closed, and a position that goes nowhere for days is closed.
 
 PHASE TWO: THE HUNT
-Only then look for new trades, and only if a slot is free. The book holds at most two positions, resting orders included. Two positions in the same direction are one bet on the market, so prefer the strongest coin for a long and the weakest for a short. A long in the strongest coin with a short in the weakest earns on the difference and hedges the market.
+Only then look for new trades, and only if a slot is free. The book holds at most the number of positions named in the dossier under THE BOOK, resting orders included. Positions in the same direction are one bet on the market, so prefer the strongest coin for a long and the weakest for a short. A long in the strongest coin with a short in the weakest earns on the difference and hedges the market.
 
 The dossier computes the numbers for you: trend score from minus 100 to plus 100 across daily, 4h and 1h, ADX, EMAs, ATR, RSI on three timeframes, Bollinger position and squeeze, ranges, volume against its average, VWAP, swing highs and lows, relative strength against BTC and a strength rank. Use them. Do not recompute them and do not invent numbers that are not there.
 
@@ -716,7 +716,7 @@ lines.push('BTC trend score ' + (btc ? sg(btc.trend, 0) : 'n/a') + '. ' + up + '
 if (ranked.length >= 6) lines.push('Strongest over 3 to 7 days: ' + ranked.slice(0, 3).map((card) => card.lane.symbol).join(', ') + '. Weakest: ' + ranked.slice(-3).reverse().map((card) => card.lane.symbol).join(', ') + '.');
 lines.push('');
 lines.push('THE BOOK');
-lines.push('Open positions: ' + openCount + '. Resting orders: ' + restingCount + '. The book holds at most ' + config.maxPositions + ' together.');
+lines.push('Open positions: ' + openCount + '. Resting orders: ' + restingCount + '. POSITION LIMIT: the book holds at most ' + config.maxPositions + ' positions in total, resting orders included. Do not open a new trade when that many slots are already taken.');
 if (equityEur !== null) {
   lines.push('Desk equity: ' + eur(equityEur) + ' USDC, which is free USDC ' + eur(eurFree) + ' plus the open positions. Today: ' + (dayPnlPct === null ? 'unknown' : sg(dayPnlPct, 2) + '%') + '. There is no daily limit.');
   lines.push('Maximum per position: ' + config.maxSizePct + '% of desk equity, about ' + eur((equityEur * Number(config.maxSizePct)) / 100) + ' USDC. Risk per trade: a stop may cost at most ' + config.riskPerTradePct + '% of desk equity, fees included.');
@@ -1242,7 +1242,7 @@ return [{ json: {
 } }];`;
 
 const keysNoteText = 'Kraken key and secret live in the data table orbit_kraken. No withdraw permission. Shorts run on Kraken margin with the same key, so margin must be enabled on the account. Without the row Orbit reads prices and writes wait.';
-const gateNoteText = 'Every round the Risk Gate first runs the desk rules on open positions: target touched, break-even at +1R, trailing from +1.5R, time stop. Then it checks what Orbit proposes: at most two positions, 45% each, a stop inside the ATR band, a target that pays the fees, conviction above 0.62. Entries are resting limit orders with a stop-loss attached. There is no daily limit. The numbers live on Desk Config.';
+const gateNoteText = 'Every round the Risk Gate first runs the desk rules on open positions: target touched, break-even at +1R, trailing from +1.5R, time stop. Then it checks what Orbit proposes: at most the Desk Config position limit, 45% each, a stop inside the ATR band, a target that pays the fees, conviction above 0.62. Entries are resting limit orders with a stop-loss attached. There is no daily limit. The numbers live on Desk Config.';
 const publishNoteText = 'Published means every hour, two minutes past. Run Now is the webhook behind the app button, guarded by the x-orbit-token header; sync.mjs sets it from ORBIT_RUN_TOKEN. Do not use Manual watch with live keys: a manual run trades but does not remember its positions.';
 
 const hourly = trigger({ type: 'n8n-nodes-base.scheduleTrigger', version: 1.4, config: { name: 'Hourly Watch', parameters: { rule: { interval: [{ field: 'hours', hoursInterval: 1, triggerAtMinute: 2 }] } }, output: [{ scheduled: true }] } });

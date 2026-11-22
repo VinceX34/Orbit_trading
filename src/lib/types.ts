@@ -174,6 +174,7 @@ export type FlowState = {
   summary: string;
   workflowId: string | null;
   published: boolean | null;
+  maxPositions: number;
   equityQuote: number | null;
   dayPnlPct: number | null;
   asOf: string | null;

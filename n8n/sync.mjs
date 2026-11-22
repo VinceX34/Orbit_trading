@@ -49,8 +49,12 @@ for (const [name, jsCode] of Object.entries(code)) {
   named(name).parameters.jsCode = jsCode;
 }
 
+const deskValues = { ...parts.deskValues };
+const currentLimit = named('Desk Config').parameters?.assignments?.assignments?.find((item) => item.name === 'maxPositions');
+const keptLimit = Number(currentLimit?.value);
+if (Number.isInteger(keptLimit) && keptLimit >= 1 && keptLimit <= 5) deskValues.maxPositions = keptLimit;
 named('Desk Config').parameters.assignments = {
-  assignments: Object.entries(parts.deskValues).map(([name, value]) => ({
+  assignments: Object.entries(deskValues).map(([name, value]) => ({
     id: name,
     name,
     value,

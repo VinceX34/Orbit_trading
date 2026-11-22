@@ -43,7 +43,7 @@ There is no daily limit on profit or loss. Every round has two phases.
 
 **The hunt.** Only when a slot is free.
 
-- At most two positions, resting orders included, each at most 45% of desk equity. A stop may cost at most 2% of desk equity, fees included, so a wide stop means a smaller position. Desk equity is free USDC plus Orbit's own positions, not the rest of the Kraken account.
+- At most three positions on the Orbit flow, resting orders included. The number is set per flow in the app, from 1 to 5. That same number is written into the n8n dossier the model reads, and the risk gate refuses a new trade past it. Each position is at most 45% of desk equity. A stop may cost at most 2% of desk equity, fees included, so a wide stop means a smaller position. Desk equity is free USDC plus Orbit's own positions, not the rest of the Kraken account.
 - A long is a spot buy. A short is a margin sell at 2x leverage. AVAX/USDC has no margin on Kraken, so AVAX is long only.
 - Entries are post-only limit orders at the model's entry price, valid for 55 minutes. That pays Kraken's maker fee instead of the taker fee. If the price does not come to the order, there is no trade.
 - Every entry carries a real stop-loss order on Kraken, between 1.2 and 3.5 times the 4h ATR from the entry and never more than 6%.
