@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { actionLabel, ruleLabels } from "@/lib/labels";
+import { actionLabel, ruleLabels, setupLabel } from "@/lib/labels";
 import type { CoinLane, Decision, DeskState } from "@/lib/types";
 
 function formatWhen(value: string | null): string {
@@ -30,7 +30,7 @@ function formatUsdc(value: number | null): string {
 function tone(action: string | null): string {
   if (action === "long" || action === "buy") return "text-mint";
   if (action === "short" || action === "sell") return "text-rose";
-  if (action === "close") return "text-ice";
+  if (action === "close" || action === "manage") return "text-ice";
   return "text-violet";
 }
 
@@ -43,30 +43,8 @@ function plan(coin: CoinLane): string | null {
   if (coin.target !== null) bits.push(`target ${coin.target}`);
   if (coin.sizePct !== null) bits.push(`${coin.sizePct}% of desk`);
   if (coin.pnlPct !== null) bits.push(`now ${formatPct(coin.pnlPct)}`);
+  if (coin.r !== null) bits.push(`${coin.r > 0 ? "+" : ""}${coin.r.toFixed(2)}R`);
   return bits.join(" · ");
-}
-
-function Tide({ pct }: { pct: number | null }) {
-  const min = -3;
-  const max = 1;
-  const clamped = pct === null ? null : Math.min(max, Math.max(min, pct));
-  const position = clamped === null ? 50 : ((clamped - min) / (max - min)) * 100;
-  return (
-    <div>
-      <div className="flex justify-between font-mono text-[11px] uppercase tracking-[0.16em] text-paper-dim">
-        <span>−3%</span>
-        <span>the line +1%</span>
-      </div>
-      <div className="relative mt-3 h-2 rounded-full bg-ink">
-        <div className="absolute inset-y-0 left-0 rounded-full bg-[linear-gradient(90deg,var(--rose),var(--violet),var(--ice))]" style={{ width: "100%" }} />
-        <div
-          className="absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full border border-ink bg-paper"
-          style={{ left: `calc(${position}% - 8px)` }}
-        />
-      </div>
-      <p className="mt-3 font-mono text-2xl text-paper">{formatPct(pct)}</p>
-    </div>
-  );
 }
 
 function Lane({ coin }: { coin: CoinLane }) {
@@ -81,6 +59,7 @@ function Lane({ coin }: { coin: CoinLane }) {
         {coin.note ? <p className="mt-2 text-sm leading-6 text-violet">{coin.note}</p> : null}
         <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.14em] text-paper-dim">
           {coin.confidence === null ? "—" : coin.confidence.toFixed(2)}
+          {coin.setupType ? ` · ${setupLabel(coin.setupType)}` : ""}
           {coin.blockedByRule ? ` · ${ruleLabels[coin.blockedByRule] || coin.blockedByRule}` : ""}
           {coin.inPosition ? " · held" : ""}
           {coin.order?.txid ? ` · ${coin.order.txid}` : ""}
@@ -207,9 +186,10 @@ export function Desk({ view }: { view: "desk" | "log" }) {
           <p className="mt-4 text-sm leading-6 text-ice">Missing in .env.local: {state.missing.join(", ")}.</p>
         ) : null}
         {state?.error ? <p className="mt-4 text-sm leading-6 text-rose">{state.error}</p> : null}
-        <div className="mt-6">
-          <Tide pct={latest?.dayPnlPct ?? null} />
-          <p className="mt-2 font-mono text-xs text-paper-dim">Desk {formatUsdc(latest?.equityQuote ?? null)}</p>
+        <div className="mt-6 border-t border-[var(--line)] pt-5">
+          <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-paper-dim">Desk</p>
+          <p className="mt-2 font-mono text-2xl text-paper">{formatUsdc(latest?.equityQuote ?? null)}</p>
+          <p className="mt-2 font-mono text-xs text-paper-dim">Today {formatPct(latest?.dayPnlPct ?? null)}</p>
         </div>
       </aside>
 

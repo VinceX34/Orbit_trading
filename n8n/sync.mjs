@@ -69,9 +69,9 @@ orbit.responses = {
 };
 orbit.options = {
   ...orbit.options,
-  maxTokens: 12000,
+  maxTokens: 20000,
   store: false,
-  reasoning: { reasoningOptions: { effort: 'medium', summary: 'concise' } },
+  reasoning: { reasoningOptions: { effort: 'high', summary: 'concise' } },
   textFormat: {
     textOptions: {
       type: 'json_schema',
@@ -110,6 +110,8 @@ runNow.parameters = {
   },
 };
 wf.connections['Run Now'] = { main: [[{ node: 'Desk Config', type: 'main', index: 0 }]] };
+named('Risk Gate');
+wf.connections['Model Offline'] = { main: [[{ node: 'Risk Gate', type: 'main', index: 0 }]] };
 
 for (const item of wf.nodes.filter((entry) => entry.type === 'n8n-nodes-base.stickyNote')) {
   const content = String(item.parameters.content || '');

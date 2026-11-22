@@ -20,43 +20,73 @@ const deskValues = {
   pairQuery: pairQuery,
   maxPositions: 2,
   maxSizePct: 45,
-  maxStopPct: 1.5,
-  minStopPct: 0.3,
-  dailyLossPct: -3,
-  dailyTargetPct: 1,
+  riskPerTradePct: 2,
+  minStopAtr: 1.2,
+  maxStopAtr: 3.5,
+  maxStopPct: 6,
+  minNetRR: 1.3,
   minConfidence: 0.62,
-  takerFeePct: 0.4,
+  takerFeePct: 0.8,
+  makerFeePct: 0.4,
   shortLeverage: 2,
   orbitRef: 7071,
+  entryTtlMin: 55,
+  breakEvenR: 1,
+  trailStartR: 1.5,
+  trailAtr: 2,
+  timeStopHours: 72,
+  cooldownHours: 6,
 };
 
-const instructions = `You are Orbit. Once an hour you read ten Kraken pairs against USDC: BTC, ETH, SOL, XRP, ADA, DOGE, LINK, AVAX, DOT and LTC. You trade both directions. A long is bought on spot. A short is sold on margin at the leverage in the dossier and bought back later. A coin marked long only in the dossier cannot be shorted. No other pairs. No story about a market that is not in the dossier.
+const instructions = `You are Orbit, a swing trader on ten Kraken pairs against USDC: BTC, ETH, SOL, XRP, ADA, DOGE, LINK, AVAX, DOT and LTC. You trade both directions. A long is bought on spot. A short is sold on margin at the leverage in the dossier. A coin marked long only cannot be shorted. The goal is to grow the desk after fees. There is no daily limit in either direction. The only thing that counts is the quality of each trade.
 
-The book holds at most two positions at the same time, across all ten coins. Each position may use at most the share of desk equity in the dossier. Pick the best setups: two, one, or none. Most hours the right answer is to wait. Waiting is a decision, and you write it with the same care as a trade.
+Fees decide everything here. The dossier gives the fee per leg on this account. A full trade costs more than one percent of the position before the price has moved. A small move is never a trade. You hold for hours to days, not minutes. Most rounds you open nothing, and that is correct.
 
-The method is yours. Read the candles and choose the analysis that fits this hour: trend and market structure, support and resistance, ranges and breakouts, momentum, volume, volatility, moving averages or an RSI you compute yourself from the closes, relative strength between the coins, or anything else the numbers allow. In setup, name the analysis, the numbers it rests on, and why this is a good entry now and not an hour later.
+Every round has two phases, in this order.
 
-Every new position needs a plan:
-stop is the price where the idea is wrong. Kraken places it as a real stop-loss order the moment the trade fills. For a long it sits below the last price, for a short above it, and never further away than the maximum stop distance in the dossier. Losses per coin stay small.
-target is the price where you take the profit. The desk closes the position in the first round after the last price touches it. The distance to the target must clearly pay the round-trip toll.
-sizePct is the share of desk equity for this position, between 5 and the maximum in the dossier.
+PHASE ONE: THE BOOK
+Go through every open position and every resting order before you look at anything new. The dossier gives each position a card: result in percent and in R (one R is the distance from entry to the first stop), the best and worst it has been, hours open, the trend score at entry and now, your own thesis and invalidation from the entry, and a desk reading with flags. Judge each position on these questions:
+1. Is the thesis still true, or has your own invalidation happened?
+2. Is the trend score still on your side on the 4h and the daily, or has it faded or flipped?
+3. Did the last closed hourly candles break the structure you leaned on, a swing low for a long or a swing high for a short?
+4. Is momentum fading against you: RSI rolling over, closes against the position, volume rising on the wrong side?
+5. Is the position paying for the time it takes, or is it stale?
+6. Is the remaining distance to the target still realistic against the nearest swing and the range?
+Then choose:
+hold, when the thesis is intact. Do not close a healthy position because of one candle. Noise inside the stop is the cost of the trade.
+manage, to tighten the stop behind new structure or to move the target. A stop only ever moves in the direction of the profit. Give the new stop, the new target, or both; null leaves a level as it is.
+close, when the thesis is broken. Do not wait for the stop to say what you already see. When the desk reading says BROKEN, close unless you can name the number that proves it wrong.
+For a resting limit order that has not filled: hold leaves it, close cancels it.
+The desk also manages by rule, with or without you: at plus one R the stop goes to the entry, from plus one and a half R it trails behind the best price, a touched target is closed, and a position that goes nowhere for days is closed.
 
-Per coin you choose one action:
-long opens a long position, only when that coin has no position.
-short opens a short position, only when that coin has no position and is not marked long only.
-close closes the open position on that coin, long or short.
-hold does nothing. On an open position it leaves the stop and target in place.
+PHASE TWO: THE HUNT
+Only then look for new trades, and only if a slot is free. The book holds at most two positions, resting orders included. Two positions in the same direction are one bet on the market, so prefer the strongest coin for a long and the weakest for a short. A long in the strongest coin with a short in the weakest earns on the difference and hedges the market.
 
-Count the toll. One leg costs about the taker percentage in the dossier, a round trip twice that. A short also pays a small margin fee every four hours. A move that does not cover that is not an idea.
+The dossier computes the numbers for you: trend score from minus 100 to plus 100 across daily, 4h and 1h, ADX, EMAs, ATR, RSI on three timeframes, Bollinger position and squeeze, ranges, volume against its average, VWAP, swing highs and lows, relative strength against BTC and a strength rank. Use them. Do not recompute them and do not invent numbers that are not there.
 
-confidence is a number between 0 and 1. Below the threshold in the dossier no new position opens.
+The house playbook. Name the one you use in setupType.
+trend_pullback: trend score beyond 50 in your direction, ADX 4h above 20. Price has pulled back toward the EMA20 on 1h or 4h or a prior swing, RSI 1h has cooled to the middle, and the last closed candle turns back with the trend. The entry is a limit at the pullback level. The stop sits beyond the pullback swing. The target is the prior extreme or beyond.
+breakout: Bollinger width in its lowest fifth, then an hourly close beyond the 24h or 72h range on volume above one and a half times average, not against the 4h trend. The entry is a limit at the retest of the broken level. The stop sits back inside the range.
+range_fade: ADX 4h below 18 and a flat trend score. Price at the edge of the 72h range with RSI 1h beyond 70 or below 30 and a rejection wick. The target is the middle or the other edge. The stop sits beyond the edge.
+exhaustion_reversal: a move of more than three ATR in a few hours into an RSI extreme on 1h and 4h, a volume climax, then a candle that reclaims. Rare, small, and only with a stop beyond the extreme.
+other: your own idea, when the numbers support it. Say exactly which numbers.
+Never sell a coin that is already deeply oversold after a fall, and never buy one that is already overbought after a run, unless it is one of the setups above. Chasing the last candle is how this desk lost money. Read the list of your last trades in the dossier and do not repeat a pattern that failed.
+
+Every new trade needs:
+entry: the limit price where you want to be filled. The desk places a resting limit order there, never above the bid for a long and never below the ask for a short, valid for about one hour. If the price does not come to you, there is no trade, and that is fine.
+stop: the price where the idea is wrong, beyond real structure. The distance from the entry must fall inside the stop band given per coin in the dossier, which is set by the 4h ATR. A stop inside the noise is a donation.
+target: the price where you take the profit. The reward after fees must be at least the multiple of the risk after fees given in the dossier.
+sizePct: the share of desk equity, up to the maximum in the dossier. The desk makes it smaller when the stop is wide, so that one stop never costs more than the risk per trade in the dossier.
+confidence: between 0 and 1. Below the threshold in the dossier nothing opens.
+
+Per coin you choose one action: long, short, close, manage or hold.
 
 Write in English, in the first person, concrete and calm. Every judgment hangs on a number from the dossier. Forbidden sentences: the market is volatile, this is not financial advice, I see opportunities.
 
 thesis is one sentence for the whole round.
-reason is the journal of the round, between 90 and 200 words: what you picked and why, and which coins you deliberately left alone.
+reason is the journal of the round, between 100 and 220 words: first the verdict on each open position and resting order, then what you looked for and why you opened or did not.
 mood is one word. No emoji.
-coins contains exactly the ten pairs from the dossier, in the same order, with pair exactly as in the dossier. line is one sentence on that coin this hour. setup is your analysis for a new position, or an empty string. stop, target and sizePct are numbers for long and short, and null for close and hold. invalidation is the concrete condition that would make that coin wrong this hour.
+coins contains exactly the ten pairs from the dossier, in the same order, with pair exactly as in the dossier. line is one sentence on that coin this hour. setup is your analysis: for a new trade the setup and why this entry, for an open position your answers to the review questions, otherwise an empty string. setupType is none for close, manage and hold. entry, stop, target and sizePct are numbers for long and short. For manage, stop and target are the new levels or null, and entry and sizePct are null. For close and hold all four are null. invalidation is the concrete condition that would make your view on that coin wrong.
 Write prices as plain numbers with a dot as decimal sign, as in the dossier.
 
 Reply only in the requested schema.`;
@@ -77,16 +107,18 @@ const roundSchema = {
         additionalProperties: false,
         properties: {
           pair: { type: 'string' },
-          action: { type: 'string', enum: ['long', 'short', 'close', 'hold'] },
+          action: { type: 'string', enum: ['long', 'short', 'close', 'manage', 'hold'] },
+          setupType: { type: 'string', enum: ['trend_pullback', 'breakout', 'range_fade', 'exhaustion_reversal', 'other', 'none'] },
           confidence: { type: 'number' },
           line: { type: 'string' },
           setup: { type: 'string' },
+          entry: { type: ['number', 'null'] },
           stop: { type: ['number', 'null'] },
           target: { type: ['number', 'null'] },
           sizePct: { type: ['number', 'null'] },
           invalidation: { type: 'string' },
         },
-        required: ['pair', 'action', 'confidence', 'line', 'setup', 'stop', 'target', 'sizePct', 'invalidation'],
+        required: ['pair', 'action', 'setupType', 'confidence', 'line', 'setup', 'entry', 'stop', 'target', 'sizePct', 'invalidation'],
       },
     },
   },
@@ -147,6 +179,9 @@ const dossierCode = `function num(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
+function ok(value) {
+  return value !== null && value !== undefined && Number.isFinite(Number(value));
+}
 function clock(date) {
   return new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Amsterdam', weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).format(date);
 }
@@ -154,12 +189,18 @@ function dayKey(date) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Amsterdam', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 }
 function eur(value) {
-  if (value === null || value === undefined || !Number.isFinite(Number(value))) return 'unknown';
-  return Number(value).toFixed(2);
+  return ok(value) ? Number(value).toFixed(2) : 'unknown';
 }
 function px(value, digits) {
-  if (value === null || value === undefined || !Number.isFinite(Number(value))) return 'n/a';
-  return Number(value).toFixed(digits);
+  return ok(value) ? Number(value).toFixed(digits) : 'n/a';
+}
+function sg(value, digits) {
+  if (!ok(value)) return 'n/a';
+  const amount = Number(value);
+  return (amount > 0 ? '+' : '') + amount.toFixed(digits);
+}
+function fx(value, digits) {
+  return ok(value) ? Number(value).toFixed(digits) : 'n/a';
 }
 function vol(value) {
   const amount = Number(value);
@@ -168,9 +209,137 @@ function vol(value) {
   if (amount >= 1) return amount.toFixed(1);
   return amount.toFixed(4);
 }
-function bar(open, high, low, close, volume, digits) {
-  return px(open, digits) + '/' + px(high, digits) + '/' + px(low, digits) + '/' + px(close, digits) + '/' + vol(volume);
+function lastOf(list) {
+  return list.length ? list[list.length - 1] : null;
 }
+function emaSeries(values, n) {
+  const k = 2 / (n + 1);
+  const out = [];
+  let prev = null;
+  for (const value of values) {
+    prev = prev === null ? value : value * k + prev * (1 - k);
+    out.push(prev);
+  }
+  return out;
+}
+function rsi(closes, n) {
+  if (closes.length <= n) return null;
+  let gain = 0;
+  let loss = 0;
+  for (let i = 1; i <= n; i++) {
+    const d = closes[i] - closes[i - 1];
+    if (d >= 0) gain += d; else loss -= d;
+  }
+  gain /= n;
+  loss /= n;
+  for (let i = n + 1; i < closes.length; i++) {
+    const d = closes[i] - closes[i - 1];
+    gain = (gain * (n - 1) + Math.max(d, 0)) / n;
+    loss = (loss * (n - 1) + Math.max(-d, 0)) / n;
+  }
+  if (loss === 0) return 100;
+  return 100 - 100 / (1 + gain / loss);
+}
+function atr(bars, n) {
+  if (bars.length <= n) return null;
+  const trs = [];
+  for (let i = 1; i < bars.length; i++) {
+    const b = bars[i];
+    const p = bars[i - 1].c;
+    trs.push(Math.max(b.h - b.l, Math.abs(b.h - p), Math.abs(b.l - p)));
+  }
+  let value = 0;
+  for (let i = 0; i < n; i++) value += trs[i];
+  value /= n;
+  for (let i = n; i < trs.length; i++) value = (value * (n - 1) + trs[i]) / n;
+  return value;
+}
+function adx(bars, n) {
+  if (bars.length <= n * 2) return null;
+  let trS = 0;
+  let pS = 0;
+  let mS = 0;
+  const dxs = [];
+  for (let i = 1; i < bars.length; i++) {
+    const b = bars[i];
+    const p = bars[i - 1];
+    const up = b.h - p.h;
+    const down = p.l - b.l;
+    const pdm = up > down && up > 0 ? up : 0;
+    const mdm = down > up && down > 0 ? down : 0;
+    const tr = Math.max(b.h - b.l, Math.abs(b.h - p.c), Math.abs(b.l - p.c));
+    if (i <= n) {
+      trS += tr; pS += pdm; mS += mdm;
+      if (i < n) continue;
+    } else {
+      trS = trS - trS / n + tr;
+      pS = pS - pS / n + pdm;
+      mS = mS - mS / n + mdm;
+    }
+    const pdi = trS ? (100 * pS) / trS : 0;
+    const mdi = trS ? (100 * mS) / trS : 0;
+    dxs.push(pdi + mdi ? (100 * Math.abs(pdi - mdi)) / (pdi + mdi) : 0);
+  }
+  if (dxs.length < n) return null;
+  let value = 0;
+  for (let i = 0; i < n; i++) value += dxs[i];
+  value /= n;
+  for (let i = n; i < dxs.length; i++) value = (value * (n - 1) + dxs[i]) / n;
+  return value;
+}
+function group(bars, seconds) {
+  const out = [];
+  let key = null;
+  for (const b of bars) {
+    const k = Math.floor(b.t / seconds);
+    if (k !== key) {
+      out.push({ t: k * seconds, o: b.o, h: b.h, l: b.l, c: b.c, v: b.v });
+      key = k;
+    } else {
+      const g = out[out.length - 1];
+      g.h = Math.max(g.h, b.h);
+      g.l = Math.min(g.l, b.l);
+      g.c = b.c;
+      g.v += b.v;
+    }
+  }
+  return out;
+}
+function pivots(bars, w) {
+  const highs = [];
+  const lows = [];
+  for (let i = w; i < bars.length - w; i++) {
+    let isHigh = true;
+    let isLow = true;
+    for (let j = i - w; j <= i + w; j++) {
+      if (j === i) continue;
+      if (bars[j].h >= bars[i].h) isHigh = false;
+      if (bars[j].l <= bars[i].l) isLow = false;
+    }
+    if (isHigh) highs.push(bars[i].h);
+    if (isLow) lows.push(bars[i].l);
+  }
+  return { highs: highs.slice(-3), lows: lows.slice(-3) };
+}
+function maxOf(bars, key) {
+  let value = null;
+  for (const b of bars) if (value === null || b[key] > value) value = b[key];
+  return value;
+}
+function minOf(bars, key) {
+  let value = null;
+  for (const b of bars) if (value === null || b[key] < value) value = b[key];
+  return value;
+}
+function sumOf(bars, key) {
+  let value = 0;
+  for (const b of bars) value += b[key] || 0;
+  return value;
+}
+function barText(b, digits) {
+  return px(b.o, digits) + '/' + px(b.h, digits) + '/' + px(b.l, digits) + '/' + px(b.c, digits) + '/' + vol(b.v);
+}
+const nl = String.fromCharCode(10);
 const config = $('Desk Config').first().json;
 let laneDefs = [];
 try { laneDefs = JSON.parse(config.lanes); } catch (error) { laneDefs = []; }
@@ -179,7 +348,22 @@ const quotes = tickerBody && tickerBody.result ? tickerBody.result : {};
 const store = $getWorkflowStaticData('global');
 const candles = store.scratch && store.scratch.candles ? store.scratch.candles : {};
 if (!store.positions || typeof store.positions !== 'object') store.positions = {};
+if (!store.pending || typeof store.pending !== 'object') store.pending = {};
+if (!store.cooldown || typeof store.cooldown !== 'object') store.cooldown = {};
+if (!Array.isArray(store.history)) {
+  store.history = [
+    { symbol: 'BTC', side: 'short', setupType: 'before the rebuild', grossPct: 4.36, netPct: 2.75, r: null, hours: 11.0, how: 'closed by the desk', at: 0 },
+    { symbol: 'ETH', side: 'short', setupType: 'before the rebuild', grossPct: 1.83, netPct: 0.22, r: null, hours: 4.0, how: 'closed by the desk', at: 0 },
+    { symbol: 'BTC', side: 'long', setupType: 'before the rebuild', grossPct: -0.52, netPct: -2.12, r: null, hours: 3.5, how: 'stop on Kraken', at: 0 },
+    { symbol: 'SOL', side: 'long', setupType: 'before the rebuild', grossPct: -0.62, netPct: -2.22, r: null, hours: 3.6, how: 'stop on Kraken', at: 0 },
+    { symbol: 'ETH', side: 'short', setupType: 'before the rebuild', grossPct: -1.5, netPct: -3.12, r: null, hours: 3.3, how: 'stop on Kraken', at: 0 },
+    { symbol: 'XRP', side: 'short', setupType: 'before the rebuild', grossPct: -1.22, netPct: -2.84, r: null, hours: 2.5, how: 'stop on Kraken', at: 0 },
+    { symbol: 'BTC', side: 'short', setupType: 'before the rebuild', grossPct: -1.26, netPct: -2.87, r: null, hours: 0.8, how: 'stop on Kraken', at: 0 },
+    { symbol: 'ETH', side: 'short', setupType: 'before the rebuild', grossPct: -1.68, netPct: -3.29, r: null, hours: 0.8, how: 'stop on Kraken', at: 0 },
+  ];
+}
 const positions = store.positions;
+const pendings = store.pending;
 const keys = $('Keys Present').first().json;
 let balanceBody = null;
 let ordersBody = null;
@@ -193,29 +377,114 @@ if (!Object.keys(quotes).length) exchangeErrors.push('Ticker returned no prices'
 if (balanceBody && Array.isArray(balanceBody.error) && balanceBody.error.length) exchangeErrors.push(balanceBody.error.join(', '));
 if (ordersBody && Array.isArray(ordersBody.error) && ordersBody.error.length) exchangeErrors.push(ordersBody.error.join(', '));
 if (tradesBody && Array.isArray(tradesBody.error) && tradesBody.error.length) exchangeErrors.push(tradesBody.error.join(', '));
+if (keys.hasKeys && (!balanceBody || !balanceBody.result || !ordersBody || !ordersBody.result || !tradesBody || !tradesBody.result)) exchangeErrors.push('Kraken did not return the account');
 const balances = balanceBody && balanceBody.result ? balanceBody.result : {};
 const eurFree = num(balances.USDC) || 0;
 const tradeMap = tradesBody && tradesBody.result && tradesBody.result.trades ? tradesBody.result.trades : {};
+const tradeList = Object.keys(tradeMap).map((id) => tradeMap[id]);
 const openMap = ordersBody && ordersBody.result && ordersBody.result.open ? ordersBody.result.open : {};
 const orbitRef = Number(config.orbitRef);
 const accountRead = Boolean(keys.hasKeys) && !exchangeErrors.length;
-const exits = {};
+const nowSec = Date.now() / 1000;
+const symbolOf = {};
+for (const lane of laneDefs) symbolOf[lane.pair] = lane.symbol;
+let taker = Number(config.takerFeePct) || 0.8;
+let maker = Number(config.makerFeePct) || 0.4;
+let takerAt = 0;
+let makerAt = 0;
+for (const trade of tradeList) {
+  const time = Number(trade.time);
+  const cost = Number(trade.cost);
+  const fee = Number(trade.fee);
+  if (!symbolOf[String(trade.pair)] || !(cost > 0) || !(fee > 0) || nowSec - time > 30 * 86400) continue;
+  const rate = (fee / cost) * 100;
+  if (trade.maker === true) {
+    if (time > makerAt) { maker = rate; makerAt = time; }
+  } else if (time > takerAt) { taker = rate; takerAt = time; }
+}
+if (takerAt && !makerAt) maker = taker / 2;
+const feeRT = maker + taker;
+function fillsOf(txid) {
+  let volume = 0;
+  let cost = 0;
+  let fee = 0;
+  let first = null;
+  for (const trade of tradeList) {
+    if (!txid || String(trade.ordertxid) !== String(txid)) continue;
+    volume += Number(trade.vol) || 0;
+    cost += Number(trade.cost) || 0;
+    fee += Number(trade.fee) || 0;
+    const time = Number(trade.time);
+    if (first === null || time < first) first = time;
+  }
+  return volume > 0 ? { volume: volume, price: cost / volume, cost: cost, fee: fee, time: first } : null;
+}
+const notes = {};
+function addNote(pair, text) {
+  notes[pair] = notes[pair] ? notes[pair] + ' ' + text : text;
+}
+function remember(entry) {
+  store.history.push(entry);
+  if (store.history.length > 40) store.history = store.history.slice(-40);
+}
 if (accountRead) {
+  for (const pair of Object.keys(pendings)) {
+    const pend = pendings[pair];
+    if (!pend || !pend.txid) { delete pendings[pair]; continue; }
+    const fill = fillsOf(pend.txid);
+    const working = Boolean(openMap[pend.txid]);
+    if (fill && !positions[pair]) {
+      positions[pair] = {
+        side: pend.side, volume: fill.volume, entry: fill.price, stop: pend.stop, initStop: pend.stop, target: pend.target,
+        openedAt: fill.time, txid: pend.txid, feeIn: fill.fee, costIn: fill.cost, best: fill.price,
+        setup: pend.setup || '', setupType: pend.setupType || 'other', invalidation: pend.invalidation || '', trendAtEntry: pend.trend,
+      };
+      addNote(pair, 'The limit order filled at ' + fill.price + '.');
+    }
+    if (!working) {
+      if (!fill) addNote(pair, 'The limit order at ' + pend.limit + (pend.cancelled ? ' was cancelled.' : ' expired without a fill. No trade.'));
+      delete pendings[pair];
+    }
+  }
   for (const pair of Object.keys(positions)) {
     const pos = positions[pair];
     if (!pos || (pos.side !== 'long' && pos.side !== 'short')) { delete positions[pair]; continue; }
+    const fill = fillsOf(pos.txid);
+    if (fill) {
+      pos.volume = fill.volume;
+      pos.entry = fill.price;
+      pos.feeIn = fill.fee;
+      pos.costIn = fill.cost;
+      pos.openedAt = fill.time;
+    }
+    if (!ok(pos.initStop)) pos.initStop = pos.stop;
     const closeSide = pos.side === 'long' ? 'sell' : 'buy';
-    let hit = null;
-    for (const id of Object.keys(tradeMap)) {
-      const trade = tradeMap[id];
+    let volume = 0;
+    let cost = 0;
+    let fee = 0;
+    let lastTime = 0;
+    for (const trade of tradeList) {
       if (String(trade.pair) !== pair || trade.type !== closeSide) continue;
       if (Number(trade.time) <= Number(pos.openedAt)) continue;
-      if (!hit || Number(trade.time) < Number(hit.time)) hit = trade;
+      if (String(trade.ordertxid) === String(pos.txid)) continue;
+      volume += Number(trade.vol) || 0;
+      cost += Number(trade.cost) || 0;
+      fee += Number(trade.fee) || 0;
+      if (Number(trade.time) > lastTime) lastTime = Number(trade.time);
     }
-    if (!hit) continue;
-    const price = num(hit.price) || 0;
-    const move = pos.entry ? (pos.side === 'long' ? (price - pos.entry) / pos.entry : (pos.entry - price) / pos.entry) * 100 : 0;
-    exits[pair] = 'Since the last round Kraken closed this ' + pos.side + ' at ' + price + ', ' + move.toFixed(2) + '% from the entry at ' + pos.entry + '. Most likely the stop.';
+    if (!(volume >= pos.volume * 0.5)) continue;
+    const price = cost / volume;
+    const dir = pos.side === 'long' ? 1 : -1;
+    const gross = ((dir * (price - pos.entry)) / pos.entry) * 100;
+    const feePct = pos.costIn > 0 ? (((Number(pos.feeIn) || 0) + fee) / pos.costIn) * 100 : feeRT;
+    const net = gross - feePct;
+    const risk = Math.abs(pos.entry - pos.initStop);
+    remember({
+      symbol: symbolOf[pair] || pair, side: pos.side, setupType: pos.setupType || 'other', grossPct: gross, netPct: net,
+      r: risk > 0 ? (dir * (price - pos.entry)) / risk : null, hours: (lastTime - Number(pos.openedAt)) / 3600, how: 'stop on Kraken', at: lastTime,
+    });
+    addNote(pair, 'Since the last round Kraken closed this ' + pos.side + ' at ' + price + ': ' + sg(gross, 2) + '% on the price, ' + sg(net, 2) + '% after fees. Most likely the stop.');
+    if (net < 0) store.cooldown[pair] = { side: pos.side, until: lastTime + Number(config.cooldownHours) * 3600 };
     delete positions[pair];
   }
 }
@@ -234,8 +503,7 @@ function stopIds(lane, pos) {
   }
   return ids;
 }
-const lanes = [];
-const blocks = [];
+const cards = [];
 let positionValue = 0;
 for (const lane of laneDefs) {
   const digits = Number(lane.pdec) || 2;
@@ -243,55 +511,185 @@ for (const lane of laneDefs) {
   const last = num(quote.c && quote.c[0]);
   const bid = num(quote.b && quote.b[0]);
   const ask = num(quote.a && quote.a[0]);
-  const open = num(quote.o);
-  const low = num(quote.l && quote.l[1]);
-  const high = num(quote.h && quote.h[1]);
-  const volume24 = num(quote.v && quote.v[1]);
   const rows = Array.isArray(candles[lane.pair]) ? candles[lane.pair] : [];
-  const hourly = rows.slice(-24).map((row) => bar(row[1], row[2], row[3], row[4], row[6], digits));
-  const days = {};
-  const dayOrder = [];
-  for (const row of rows) {
-    const key = new Date(Number(row[0]) * 1000).toISOString().slice(0, 10);
-    if (!days[key]) {
-      days[key] = { open: num(row[1]), high: num(row[2]), low: num(row[3]), close: num(row[4]), volume: 0 };
-      dayOrder.push(key);
+  const all = rows.map((row) => ({ t: Number(row[0]), o: num(row[1]), h: num(row[2]), l: num(row[3]), c: num(row[4]), vw: num(row[5]), v: num(row[6]) || 0 })).filter((b) => b.o !== null && b.h !== null && b.l !== null && b.c !== null);
+  const h1 = all.slice(0, -1);
+  const price = last || (all.length ? all[all.length - 1].c : null);
+  const h4 = group(h1, 14400);
+  const d1 = group(h1, 86400);
+  const c1 = h1.map((b) => b.c);
+  const c4 = h4.map((b) => b.c);
+  const cd = d1.map((b) => b.c);
+  const ema20 = c1.length >= 50 ? lastOf(emaSeries(c1, 20)) : null;
+  const ema50 = c1.length >= 100 ? lastOf(emaSeries(c1, 50)) : null;
+  const ema20h4 = c4.length >= 40 ? lastOf(emaSeries(c4, 20)) : null;
+  const ema50h4 = c4.length >= 80 ? lastOf(emaSeries(c4, 50)) : null;
+  const ema10d = cd.length >= 15 ? lastOf(emaSeries(cd, 10)) : null;
+  const atr1 = atr(h1.slice(-200), 14);
+  const atr4 = atr(h4, 14);
+  const rsi1 = rsi(c1.slice(-200), 14);
+  const rsi4 = rsi(c4, 14);
+  const rsiD = rsi(cd, 14);
+  const adx1 = adx(h1.slice(-200), 14);
+  const adx4 = adx(h4, 14);
+  const sw1 = pivots(h1.slice(-120), 3);
+  const sw4 = pivots(h4.slice(-90), 2);
+  let trend = 0;
+  if (price && ema10d) trend += price > ema10d ? 20 : -20;
+  if (ema20h4 && ema50h4) trend += ema20h4 > ema50h4 ? 25 : -25;
+  if (price && ema20h4) trend += price > ema20h4 ? 15 : -15;
+  if (ema20 && ema50) trend += ema20 > ema50 ? 15 : -15;
+  if (price && ema20) trend += price > ema20 ? 10 : -10;
+  let structure = 'mixed';
+  if (sw1.highs.length >= 2 && sw1.lows.length >= 2) {
+    const hh = sw1.highs[sw1.highs.length - 1] > sw1.highs[sw1.highs.length - 2];
+    const hl = sw1.lows[sw1.lows.length - 1] > sw1.lows[sw1.lows.length - 2];
+    if (hh && hl) { structure = 'higher highs and higher lows'; trend += 15; }
+    else if (!hh && !hl) { structure = 'lower highs and lower lows'; trend -= 15; }
+  }
+  let regime = 'mixed';
+  if (trend >= 50 && adx4 !== null && adx4 >= 18) regime = 'uptrend';
+  else if (trend <= -50 && adx4 !== null && adx4 >= 18) regime = 'downtrend';
+  else if (Math.abs(trend) < 50 && adx4 !== null && adx4 < 18) regime = 'range';
+  let pctB = null;
+  let bbWidth = null;
+  let bbRank = null;
+  if (c1.length >= 140 && price) {
+    const widths = [];
+    for (let k = 0; k < 120; k++) {
+      const window = c1.slice(c1.length - k - 20, c1.length - k);
+      let mean = 0;
+      for (const value of window) mean += value;
+      mean /= window.length;
+      let variance = 0;
+      for (const value of window) variance += (value - mean) * (value - mean);
+      const sd = Math.sqrt(variance / window.length);
+      widths.push(mean ? ((4 * sd) / mean) * 100 : 0);
+      if (k === 0 && sd > 0) pctB = (price - (mean - 2 * sd)) / (4 * sd);
     }
-    const day = days[key];
-    if (num(row[2]) !== null) day.high = Math.max(day.high, num(row[2]));
-    if (num(row[3]) !== null) day.low = Math.min(day.low, num(row[3]));
-    day.close = num(row[4]);
-    day.volume += num(row[6]) || 0;
+    bbWidth = widths[0];
+    let narrower = 0;
+    for (const width of widths) if (width < bbWidth) narrower += 1;
+    bbRank = (narrower / widths.length) * 100;
   }
-  const daily = dayOrder.slice(-14).map((key) => key.slice(5) + ' ' + bar(days[key].open, days[key].high, days[key].low, days[key].close, days[key].volume, digits));
+  const hi24 = maxOf(h1.slice(-24), 'h');
+  const lo24 = minOf(h1.slice(-24), 'l');
+  const hi72 = maxOf(h1.slice(-72), 'h');
+  const lo72 = minOf(h1.slice(-72), 'l');
+  const hi30 = maxOf(h1, 'h');
+  const lo30 = minOf(h1, 'l');
+  const rangePos = price && hi72 !== null && lo72 !== null && hi72 > lo72 ? ((price - lo72) / (hi72 - lo72)) * 100 : null;
+  const lastBar = h1.length ? h1[h1.length - 1] : null;
+  const avg20 = h1.length > 21 ? sumOf(h1.slice(-21, -1), 'v') / 20 : null;
+  const volRatio = lastBar && avg20 ? lastBar.v / avg20 : null;
+  const vol24 = sumOf(h1.slice(-24), 'v');
+  const volWeek = h1.length >= 168 ? sumOf(h1.slice(-168), 'v') / 7 : null;
+  const dayRatio = volWeek ? vol24 / volWeek : null;
+  let vwNum = 0;
+  let vwDen = 0;
+  for (const b of h1.slice(-24)) { vwNum += (b.vw || b.c) * b.v; vwDen += b.v; }
+  const vwap = vwDen > 0 ? vwNum / vwDen : null;
+  function ret(n) {
+    return price && c1.length >= n && c1[c1.length - n] ? (price / c1[c1.length - n] - 1) * 100 : null;
+  }
+  const card = {
+    lane: lane, digits: digits, last: last, bid: bid, ask: ask, price: price, h1: h1, h4: h4, d1: d1,
+    ema20: ema20, ema50: ema50, ema20h4: ema20h4, ema50h4: ema50h4, ema10d: ema10d, atr1: atr1, atr4: atr4,
+    rsi1: rsi1, rsi4: rsi4, rsiD: rsiD, adx1: adx1, adx4: adx4, sw1: sw1, sw4: sw4, trend: trend, structure: structure, regime: regime,
+    pctB: pctB, bbWidth: bbWidth, bbRank: bbRank, hi24: hi24, lo24: lo24, hi72: hi72, lo72: lo72, hi30: hi30, lo30: lo30, rangePos: rangePos,
+    volRatio: volRatio, dayRatio: dayRatio, vwap: vwap, r1: ret(1), r4: ret(4), r24: ret(24), r72: ret(72), r168: ret(168),
+    position: null, pending: null, review: '',
+  };
   const pos = positions[lane.pair] || null;
-  let position = null;
   if (pos) {
+    const dir = pos.side === 'long' ? 1 : -1;
     const mark = pos.side === 'long' ? bid : ask;
-    const pnlPct = mark && pos.entry ? (pos.side === 'long' ? (mark - pos.entry) / pos.entry : (pos.entry - mark) / pos.entry) * 100 : null;
+    let best = ok(pos.best) ? Number(pos.best) : pos.entry;
+    let worst = pos.entry;
+    for (const b of all) {
+      if (b.t < Number(pos.openedAt)) continue;
+      best = dir > 0 ? Math.max(best, b.h) : Math.min(best, b.l);
+      worst = dir > 0 ? Math.min(worst, b.l) : Math.max(worst, b.h);
+    }
+    if (mark) best = dir > 0 ? Math.max(best, mark) : Math.min(best, mark);
+    pos.best = best;
+    const risk = Math.abs(pos.entry - pos.initStop) || pos.entry * 0.01;
+    const rNow = mark ? (dir * (mark - pos.entry)) / risk : null;
+    const mfeR = (dir * (best - pos.entry)) / risk;
+    const maeR = (dir * (worst - pos.entry)) / risk;
+    const pnlPct = mark ? ((dir * (mark - pos.entry)) / pos.entry) * 100 : null;
+    const hours = (nowSec - Number(pos.openedAt)) / 3600;
     if (mark) positionValue += pos.side === 'long' ? pos.volume * mark : (pos.entry - mark) * pos.volume;
+    const flags = [];
+    let points = 0;
+    const trendNow = dir * trend;
+    const trendDrop = ok(pos.trendAtEntry) ? dir * Number(pos.trendAtEntry) - trendNow : null;
+    if (trendNow <= -30 && (trendDrop === null || trendDrop >= 30)) { flags.push('the trend score has turned against the position'); points += 2; }
+    else if (trendDrop !== null ? trendDrop >= 30 : trendNow < 20) { flags.push('the trend score is weaker than at the entry'); points += 1; }
+    const swing = dir > 0 ? lastOf(sw1.lows) : lastOf(sw1.highs);
+    if (lastBar && swing !== null && dir * (lastBar.c - swing) < 0) { flags.push('the last hourly close broke the last swing ' + (dir > 0 ? 'low' : 'high') + ' at ' + px(swing, digits)); points += 2; }
+    if (mfeR >= 1 && rNow !== null && rNow < mfeR * 0.4) { flags.push('more than half of the best gain is given back'); points += 1; }
+    if (hours >= 24 && rNow !== null && rNow < 0.3) { flags.push('stale after ' + hours.toFixed(0) + ' hours'); points += 1; }
+    const three = h1.slice(-3);
+    if (three.length === 3 && three.every((b) => dir * (b.c - b.o) < 0)) { flags.push('three closed hourly candles in a row against it'); points += 1; }
+    if (rsi4 !== null && ((dir > 0 && rsi4 > 75) || (dir < 0 && rsi4 < 25))) flags.push('RSI 4h is stretched in your favour, consider a tighter stop');
+    const verdict = points >= 3 ? 'BROKEN' : points >= 1 ? 'WEAKENING' : 'HEALTHY';
     const ids = stopIds(lane, pos);
-    position = {
-      side: pos.side, volume: pos.volume, entry: pos.entry, stop: pos.stop, target: pos.target, openedAt: pos.openedAt,
-      pnlPct: pnlPct, hours: (Date.now() / 1000 - Number(pos.openedAt)) / 3600, stopIds: ids, stopMissing: Boolean(pos.stopMissing),
+    card.position = {
+      side: pos.side, volume: pos.volume, entry: pos.entry, stop: pos.stop, initStop: pos.initStop, target: pos.target, openedAt: pos.openedAt,
+      pnlPct: pnlPct, rNow: rNow, mfeR: mfeR, best: best, hours: hours, stopIds: ids, stopMissing: Boolean(pos.stopMissing), verdict: verdict, setupType: pos.setupType || 'other',
     };
+    const lines = [];
+    lines.push('POSITION: ' + pos.side + ' ' + pos.volume + ' ' + lane.symbol + ' from ' + px(pos.entry, digits) + ', open ' + hours.toFixed(1) + ' hours. Now ' + sg(pnlPct, 2) + '% on the price, ' + sg(rNow, 2) + 'R. Best ' + sg(mfeR, 2) + 'R, worst ' + sg(maeR, 2) + 'R.');
+    lines.push('Stop ' + px(pos.stop, digits) + (pos.stop !== pos.initStop ? ' (first stop ' + px(pos.initStop, digits) + ')' : '') + (mark && atr1 ? ', ' + fx(Math.abs(mark - pos.stop) / atr1, 1) + ' ATR 1h from the price' : '') + '. Target ' + px(pos.target, digits) + (mark && atr1 && ok(pos.target) ? ', ' + fx(Math.abs(pos.target - mark) / atr1, 1) + ' ATR 1h away' : '') + '. ' + (ids.length ? 'The stop order is live on Kraken.' : 'No stop order found on Kraken, the desk places one this round.'));
+    lines.push('Trend score at entry ' + (ok(pos.trendAtEntry) ? sg(pos.trendAtEntry, 0) : 'unknown') + ', now ' + sg(trend, 0) + '. Setup: ' + (pos.setupType || 'other') + '.');
+    if (pos.setup) lines.push('Your thesis at entry: ' + pos.setup);
+    if (pos.invalidation) lines.push('Your invalidation at entry: ' + pos.invalidation);
+    lines.push('Desk reading: ' + verdict + (flags.length ? ' (' + flags.join('; ') + ').' : '. No flags.'));
+    card.review = lines.join(nl);
   }
-  lanes.push({
-    symbol: lane.symbol, pair: lane.pair, asset: lane.asset, alt: lane.alt, pdec: digits, ordermin: Number(lane.ordermin) || 0, canShort: lane.canShort !== false,
-    last: last, bid: bid, ask: ask, open: open, low: low, high: high, volume24: volume24,
-    position: position, holding: Boolean(position), exit: exits[lane.pair] || '',
-  });
+  const pend = pendings[lane.pair] || null;
+  if (pend) {
+    card.pending = { txid: pend.txid, side: pend.side, limit: pend.limit, volume: pend.volume, stop: pend.stop, target: pend.target, expireAt: pend.expireAt, cancelled: Boolean(pend.cancelled) };
+    if (!pos) card.review = 'RESTING ORDER: ' + pend.side + ' limit at ' + px(pend.limit, digits) + ' for ' + pend.volume + ' ' + lane.symbol + ', stop ' + px(pend.stop, digits) + ', target ' + px(pend.target, digits) + '. Not filled yet. It expires in about ' + Math.max(0, Math.round((Number(pend.expireAt) - nowSec) / 60)) + ' minutes. Setup: ' + (pend.setup || pend.setupType || '') ;
+  }
+  cards.push(card);
+}
+const btc = cards.find((card) => card.lane.symbol === 'BTC') || null;
+const ranked = cards.filter((card) => card.r72 !== null && card.r168 !== null).slice().sort((a, b) => (b.r72 + b.r168) - (a.r72 + a.r168));
+const blocks = [];
+const lanes = [];
+for (const card of cards) {
+  const lane = card.lane;
+  const d = card.digits;
+  const rank = ranked.indexOf(card);
+  const atr1Pct = card.atr1 && card.price ? (card.atr1 / card.price) * 100 : null;
+  const atr4Pct = card.atr4 && card.price ? (card.atr4 / card.price) * 100 : null;
+  const minStop = atr4Pct !== null ? Number(config.minStopAtr) * atr4Pct : null;
+  const maxStop = atr4Pct !== null ? Math.min(Number(config.maxStopAtr) * atr4Pct, Number(config.maxStopPct)) : null;
+  const cool = store.cooldown[lane.pair] && Number(store.cooldown[lane.pair].until) > nowSec ? store.cooldown[lane.pair] : null;
   const text = [];
-  text.push(lane.symbol + ' (pair ' + lane.pair + ')' + (lane.canShort === false ? ', long only' : '') + '. Last ' + px(last, digits) + ', bid ' + px(bid, digits) + ', ask ' + px(ask, digits) + '. 24 hours: open ' + px(open, digits) + ', high ' + px(high, digits) + ', low ' + px(low, digits) + ', volume ' + vol(volume24) + '.');
-  text.push('Hourly: ' + (hourly.join(' | ') || 'no candles'));
-  text.push('Daily (UTC): ' + (daily.join(' | ') || 'no candles'));
-  if (position) {
-    text.push('Position: ' + position.side + ' ' + position.volume + ' ' + lane.symbol + ' from ' + px(position.entry, digits) + ', stop ' + px(position.stop, digits) + ', target ' + px(position.target, digits) + ', now ' + (position.pnlPct === null ? 'unknown' : position.pnlPct.toFixed(2) + '%') + ', open ' + position.hours.toFixed(1) + ' hours. ' + (position.stopIds.length ? 'Stop order is live on Kraken.' : 'No stop order found on Kraken.'));
-  } else {
-    text.push('Position: none.');
-  }
-  if (exits[lane.pair]) text.push(exits[lane.pair]);
-  blocks.push(text.join(String.fromCharCode(10)));
+  text.push(lane.symbol + ' (pair ' + lane.pair + ')' + (lane.canShort === false ? ', long only' : '') + '. Last ' + px(card.last, d) + ', bid ' + px(card.bid, d) + ', ask ' + px(card.ask, d) + '.');
+  text.push('Trend score ' + sg(card.trend, 0) + ' (' + card.regime + '). 1h structure: ' + card.structure + '. ADX 4h ' + fx(card.adx4, 0) + ', 1h ' + fx(card.adx1, 0) + '. Strength rank ' + (rank >= 0 ? rank + 1 : 'n/a') + ' of ' + cards.length + '.');
+  text.push('EMA 1h 20/50: ' + px(card.ema20, d) + ' / ' + px(card.ema50, d) + '. EMA 4h 20/50: ' + px(card.ema20h4, d) + ' / ' + px(card.ema50h4, d) + '. Daily EMA10: ' + px(card.ema10d, d) + '. Stretch: ' + (card.price && card.ema20 && card.atr1 ? sg((card.price - card.ema20) / card.atr1, 1) : 'n/a') + ' ATR from EMA20 1h, ' + (card.price && card.ema20h4 && card.atr4 ? sg((card.price - card.ema20h4) / card.atr4, 1) : 'n/a') + ' ATR from EMA20 4h.');
+  text.push('ATR 1h ' + fx(atr1Pct, 2) + '% (' + px(card.atr1, d) + '), ATR 4h ' + fx(atr4Pct, 2) + '% (' + px(card.atr4, d) + '). Stop band for a new trade: ' + fx(minStop, 2) + '% to ' + fx(maxStop, 2) + '% from the entry. With the tightest stop the target must be at least ' + (minStop !== null ? fx(Number(config.minNetRR) * (minStop + feeRT) + feeRT, 2) : 'n/a') + '% away.');
+  text.push('RSI 1h ' + fx(card.rsi1, 0) + ', 4h ' + fx(card.rsi4, 0) + ', daily ' + fx(card.rsiD, 0) + '. Bollinger 1h: %B ' + fx(card.pctB, 2) + ', width ' + fx(card.bbWidth, 2) + '%, wider than ' + fx(card.bbRank, 0) + '% of the last 5 days.');
+  text.push('Returns: 1h ' + sg(card.r1, 2) + '%, 4h ' + sg(card.r4, 2) + '%, 24h ' + sg(card.r24, 2) + '%, 72h ' + sg(card.r72, 2) + '%, 7d ' + sg(card.r168, 2) + '%.' + (btc && card !== btc && card.r24 !== null && btc.r24 !== null && card.r168 !== null && btc.r168 !== null ? ' Against BTC: 24h ' + sg(card.r24 - btc.r24, 2) + '%, 7d ' + sg(card.r168 - btc.r168, 2) + '%.' : ''));
+  text.push('Range 24h ' + px(card.lo24, d) + ' to ' + px(card.hi24, d) + ', 72h ' + px(card.lo72, d) + ' to ' + px(card.hi72, d) + ', 30d ' + px(card.lo30, d) + ' to ' + px(card.hi30, d) + '. Price sits at ' + fx(card.rangePos, 0) + '% of the 72h range. VWAP 24h ' + px(card.vwap, d) + (card.vwap && card.price ? ', price ' + sg((card.price / card.vwap - 1) * 100, 2) + '% from it' : '') + '.');
+  text.push('Volume: last closed hour ' + fx(card.volRatio, 1) + 'x its 20h average, last 24h ' + fx(card.dayRatio, 1) + 'x the 7d daily average.');
+  text.push('Swings 1h, highs ' + (card.sw1.highs.map((v) => px(v, d)).join(', ') || 'none') + '; lows ' + (card.sw1.lows.map((v) => px(v, d)).join(', ') || 'none') + '. Swings 4h, highs ' + (card.sw4.highs.map((v) => px(v, d)).join(', ') || 'none') + '; lows ' + (card.sw4.lows.map((v) => px(v, d)).join(', ') || 'none') + '.');
+  text.push('1h closed: ' + (card.h1.slice(-12).map((b) => barText(b, d)).join(' | ') || 'no candles'));
+  text.push('4h: ' + (card.h4.slice(-8).map((b) => barText(b, d)).join(' | ') || 'no candles'));
+  text.push('Daily: ' + (card.d1.slice(-10).map((b) => new Date(b.t * 1000).toISOString().slice(5, 10) + ' ' + barText(b, d)).join(' | ') || 'no candles'));
+  text.push(card.review || 'No position.');
+  if (cool) text.push('Cooldown: the last ' + cool.side + ' here was a loss. No new ' + cool.side + ' on this coin for ' + ((Number(cool.until) - nowSec) / 3600).toFixed(1) + ' more hours.');
+  if (notes[lane.pair]) text.push(notes[lane.pair]);
+  blocks.push(text.join(nl));
+  lanes.push({
+    symbol: lane.symbol, pair: lane.pair, asset: lane.asset, alt: lane.alt, pdec: d, ordermin: Number(lane.ordermin) || 0, canShort: lane.canShort !== false,
+    last: card.last, bid: card.bid, ask: card.ask, atr1h: card.atr1, atr4h: card.atr4, ema20h4: card.ema20h4, trend: card.trend,
+    position: card.position, pending: card.pending, holding: Boolean(card.position), note: notes[lane.pair] || '', cooldown: cool,
+  });
 }
 const equityEur = accountRead ? eurFree + positionValue : null;
 const today = dayKey(new Date());
@@ -305,28 +703,47 @@ if (equityEur !== null) {
   dayStart = store.startEquity;
   if (dayStart > 0) dayPnlPct = ((equityEur - dayStart) / dayStart) * 100;
 }
-const tradeLines = [];
-for (const id of Object.keys(tradeMap)) {
-  const trade = tradeMap[id];
-  if (dayKey(new Date(Number(trade.time) * 1000)) !== today) continue;
-  tradeLines.push(String(trade.pair || '') + ' ' + trade.type + ' ' + trade.vol + ' at ' + trade.price);
+const up = cards.filter((card) => card.trend >= 30).length;
+const down = cards.filter((card) => card.trend <= -30).length;
+let avg24 = 0;
+let avgCount = 0;
+for (const card of cards) if (card.r24 !== null) { avg24 += card.r24; avgCount += 1; }
+const openCount = lanes.filter((lane) => lane.position).length;
+const restingCount = lanes.filter((lane) => lane.pending && !lane.position).length;
+const lines = ['DESK DOSSIER', 'Time in Amsterdam: ' + clock(new Date()) + '.', 'Ten Kraken pairs against USDC. Prices and amounts are in USDC. Long on spot, short on margin at ' + config.shortLeverage + 'x.', 'Candles are open/high/low/close/volume, old to new, closed candles only. Volume is in the coin. The 4h and daily candles are built from the hourly ones, so the newest of each is still forming. Indicators use closed hourly candles, the last price is live.', ''];
+lines.push('MARKET');
+lines.push('BTC trend score ' + (btc ? sg(btc.trend, 0) : 'n/a') + '. ' + up + ' of ' + cards.length + ' coins trend above +30, ' + down + ' below -30. Average 24h move ' + (avgCount ? sg(avg24 / avgCount, 2) : 'n/a') + '%.');
+if (ranked.length >= 6) lines.push('Strongest over 3 to 7 days: ' + ranked.slice(0, 3).map((card) => card.lane.symbol).join(', ') + '. Weakest: ' + ranked.slice(-3).reverse().map((card) => card.lane.symbol).join(', ') + '.');
+lines.push('');
+lines.push('THE BOOK');
+lines.push('Open positions: ' + openCount + '. Resting orders: ' + restingCount + '. The book holds at most ' + config.maxPositions + ' together.');
+if (equityEur !== null) {
+  lines.push('Desk equity: ' + eur(equityEur) + ' USDC, which is free USDC ' + eur(eurFree) + ' plus the open positions. Today: ' + (dayPnlPct === null ? 'unknown' : sg(dayPnlPct, 2) + '%') + '. There is no daily limit.');
+  lines.push('Maximum per position: ' + config.maxSizePct + '% of desk equity, about ' + eur((equityEur * Number(config.maxSizePct)) / 100) + ' USDC. Risk per trade: a stop may cost at most ' + config.riskPerTradePct + '% of desk equity, fees included.');
 }
-const openCount = lanes.filter((lane) => lane.holding).length;
-const nl = String.fromCharCode(10);
-const lines = ['DESK DOSSIER', 'Time in Amsterdam: ' + clock(new Date()), 'Ten Kraken pairs against USDC. Prices and amounts are in USDC. Long on spot, short on margin at ' + config.shortLeverage + 'x. At most ' + config.maxPositions + ' positions at once.', 'Candles are open/high/low/close/volume, old to new. Volume is in the coin. The newest hourly candle is still forming.', ''];
+lines.push('Fees on this account now: ' + fx(maker, 2) + '% for a resting limit order, ' + fx(taker, 2) + '% for a market order or a stop. A trade that enters on a limit and leaves at market costs about ' + fx(feeRT, 2) + '% of the position.');
+lines.push('Reward rule: (target distance - ' + fx(feeRT, 2) + '%) must be at least ' + config.minNetRR + ' times (stop distance + ' + fx(feeRT, 2) + '%). Minimum conviction: ' + config.minConfidence + '.');
+lines.push('');
+lines.push('YOUR LAST TRADES, old to new');
+const recent = store.history.slice(-10);
+if (recent.length) {
+  for (const trade of recent) {
+    lines.push(trade.symbol + ' ' + trade.side + ' (' + (trade.setupType || 'other') + '): ' + sg(trade.grossPct, 2) + '% on the price, ' + sg(trade.netPct, 2) + '% after fees' + (ok(trade.r) ? ', ' + sg(trade.r, 1) + 'R' : '') + ', ' + trade.how + ' after ' + fx(trade.hours, 1) + ' hours.');
+  }
+  const wins = recent.filter((trade) => Number(trade.netPct) > 0).length;
+  let sum = 0;
+  for (const trade of recent) sum += Number(trade.netPct) || 0;
+  lines.push(wins + ' of ' + recent.length + ' ended in profit after fees. Sum ' + sg(sum, 2) + '% of position size.');
+} else {
+  lines.push('None yet.');
+}
+lines.push('');
+lines.push('THE TEN COINS');
 lines.push(blocks.join(nl + nl));
 lines.push('');
-lines.push('Open positions: ' + openCount + ' of ' + config.maxPositions + '.');
-if (equityEur !== null) {
-  lines.push('Desk equity: ' + eur(equityEur) + ' USDC, which is free USDC ' + eur(eurFree) + ' plus the open positions. Start of the day: ' + eur(dayStart) + '. Day result: ' + (dayPnlPct === null ? 'unknown' : dayPnlPct.toFixed(3) + '%') + '.');
-  lines.push('Maximum per position: ' + config.maxSizePct + '% of desk equity, about ' + eur((equityEur * Number(config.maxSizePct)) / 100) + ' USDC.');
-}
-lines.push('Stop distance: at most ' + config.maxStopPct + '% and at least ' + config.minStopPct + '% from the last price. Minimum conviction: ' + config.minConfidence + '. Toll per leg: ' + config.takerFeePct + '%. A short also pays roughly 0.02% to open and again every 4 hours.');
-lines.push('Day line: +' + config.dailyTargetPct + '%. Above it no new position. Loss limit: ' + config.dailyLossPct + '%. Below it no new position. Closing is always allowed.');
 if (!keys.hasKeys) lines.push('The Kraken keys are not in the data table orbit_kraken yet. You may think. You may not trade.');
 lines.push(exchangeErrors.length ? 'Kraken said: ' + exchangeErrors.join(' | ') : 'Kraken returned no error.');
-lines.push('Trades today: ' + (tradeLines.length ? tradeLines.join(' | ') : 'none.'));
-return [{ json: { brief: lines.join(nl), hasKeys: Boolean(keys.hasKeys), exchangeError: exchangeErrors.join(' | '), equityEur: equityEur, dayPnlPct: dayPnlPct, eurFree: eurFree, lanes: lanes } }];`;
+return [{ json: { brief: lines.join(nl), hasKeys: Boolean(keys.hasKeys), exchangeError: exchangeErrors.join(' | '), equityEur: equityEur, dayPnlPct: dayPnlPct, eurFree: eurFree, fees: { maker: maker, taker: taker }, lanes: lanes } }];`;
 
 const journalCode = `const fence = String.fromCharCode(96).repeat(3);
 function parseText(text) {
@@ -371,12 +788,32 @@ return [{ json: {
   equityEur: dossier.equityEur,
   dayPnlPct: dossier.dayPnlPct,
   eurFree: dossier.eurFree,
+  fees: dossier.fees,
   lanes: dossier.lanes,
   thesis: parsed && parsed.thesis ? String(parsed.thesis) : '',
-  reason: parsed && parsed.reason ? String(parsed.reason) : 'The model answered, but not in the shape Orbit can read. No order this round.',
+  reason: parsed && parsed.reason ? String(parsed.reason) : 'The model answered, but not in the shape Orbit can read. Nothing new opens this round. The desk rules on open positions still ran.',
   mood: parsed && parsed.mood ? String(parsed.mood) : '',
   calls: calls,
   parseError: !parsed || !calls.length,
+  offline: false,
+} }];`;
+
+const offlineCode = `let dossier = {};
+try { dossier = $('Dossier').first().json; } catch (error) { dossier = {}; }
+return [{ json: {
+  hasKeys: Boolean(dossier.hasKeys),
+  exchangeError: dossier.exchangeError || '',
+  equityEur: dossier.equityEur === undefined ? null : dossier.equityEur,
+  dayPnlPct: dossier.dayPnlPct === undefined ? null : dossier.dayPnlPct,
+  eurFree: dossier.eurFree || 0,
+  fees: dossier.fees || null,
+  lanes: Array.isArray(dossier.lanes) ? dossier.lanes : [],
+  thesis: 'No model, no new order.',
+  reason: 'The ring on the desk is lit, but OpenAI did not answer. Nothing new opens. The desk rules on open positions still ran, and the stops on Kraken stay in place.',
+  mood: 'waiting',
+  calls: [],
+  parseError: true,
+  offline: true,
 } }];`;
 
 const gateCode = `function findCall(calls, lane) {
@@ -394,136 +831,260 @@ function numberOrNull(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
+function floorTo(value, digits) {
+  const f = Math.pow(10, digits);
+  return Math.floor(value * f + 1e-9) / f;
+}
+function ceilTo(value, digits) {
+  const f = Math.pow(10, digits);
+  return Math.ceil(value * f - 1e-9) / f;
+}
 const row = $input.first().json;
 const config = $('Desk Config').first().json;
+const store = $getWorkflowStaticData('global');
+if (!store.positions || typeof store.positions !== 'object') store.positions = {};
+const nowSec = Math.floor(Date.now() / 1000);
+const fees = row.fees && Number(row.fees.taker) > 0 ? row.fees : { maker: Number(config.makerFeePct), taker: Number(config.takerFeePct) };
+const feeRT = Number(fees.maker) + Number(fees.taker);
 const maxPositions = Number(config.maxPositions);
 const maxSizePct = Number(config.maxSizePct);
-const maxStop = Number(config.maxStopPct);
-const minStop = Number(config.minStopPct);
-const fee = Number(config.takerFeePct);
-const leverage = Number(config.shortLeverage);
-const lossLimit = Number(config.dailyLossPct);
-const dayTarget = Number(config.dailyTargetPct);
+const riskPct = Number(config.riskPerTradePct);
+const minStopAtr = Number(config.minStopAtr);
+const maxStopAtr = Number(config.maxStopAtr);
+const maxStopPct = Number(config.maxStopPct);
+const minNetRR = Number(config.minNetRR);
 const minConfidence = Number(config.minConfidence);
+const leverage = Number(config.shortLeverage);
+const beR = Number(config.breakEvenR);
+const trailR = Number(config.trailStartR);
+const trailAtr = Number(config.trailAtr);
+const timeStopHours = Number(config.timeStopHours);
+const userref = Number(config.orbitRef);
 const lanes = Array.isArray(row.lanes) ? row.lanes : [];
 const calls = Array.isArray(row.calls) ? row.calls : [];
 const pnl = typeof row.dayPnlPct === 'number' ? row.dayPnlPct : null;
 const equity = Number(row.equityEur) || 0;
-let bookBlock = null;
-if (!row.hasKeys) bookBlock = 'missing_credentials';
-else if (row.exchangeError) bookBlock = 'account_unreadable';
-else if (row.parseError) bookBlock = 'unreadable';
-const loss = pnl !== null && pnl <= lossLimit;
-const topped = pnl !== null && pnl >= dayTarget;
+const hardBlock = !row.hasKeys ? 'missing_credentials' : row.exchangeError ? 'account_unreadable' : null;
+const softBlock = row.offline ? 'model_offline' : row.parseError ? 'unreadable' : null;
+const actions = ['long', 'short', 'close', 'manage', 'hold'];
 const coins = [];
 const cancels = [];
 const closes = [];
+const amends = [];
 const candidates = [];
+let slotsUsed = 0;
+let reserved = 0;
 for (const lane of lanes) {
-  const call = findCall(calls, lane);
-  const aiAction = call && ['long', 'short', 'close', 'hold'].indexOf(call.action) >= 0 ? call.action : 'hold';
+  const call = softBlock ? null : findCall(calls, lane);
+  const aiAction = call && actions.indexOf(call.action) >= 0 ? call.action : 'hold';
   const confidence = call ? numberOrNull(call.confidence) || 0 : 0;
-  const stop = call ? numberOrNull(call.stop) : null;
-  const target = call ? numberOrNull(call.target) : null;
-  const sizePct = call ? numberOrNull(call.sizePct) : null;
+  const entryCall = call ? numberOrNull(call.entry) : null;
+  const stopCall = call ? numberOrNull(call.stop) : null;
+  const targetCall = call ? numberOrNull(call.target) : null;
+  const sizeCall = call ? numberOrNull(call.sizePct) : null;
   const pos = lane.position || null;
-  let action = aiAction;
+  const pend = lane.pending || null;
+  const digits = Number(lane.pdec) || 2;
+  const atr1 = Number(lane.atr1h) || 0;
+  const atr4 = Number(lane.atr4h) || 0;
+  const notes = lane.note ? [lane.note] : [];
+  let action = 'hold';
   let blocked = null;
-  if (pos && !bookBlock && lane.last && pos.target && ((pos.side === 'long' && lane.last >= pos.target) || (pos.side === 'short' && lane.last <= pos.target))) {
-    action = 'close';
-    blocked = 'target_hit';
-  } else if (pos && !bookBlock && pos.stopMissing) {
-    action = 'close';
-    blocked = 'stop_missing';
-  } else if (bookBlock) { action = 'hold'; blocked = bookBlock; }
-  else if (!call) { action = 'hold'; blocked = 'unreadable'; }
-  else if (action === 'close' && !pos) { action = 'hold'; blocked = 'already_flat'; }
-  else if ((action === 'long' || action === 'short') && pos) { action = 'hold'; blocked = 'already_in_position'; }
-  else if (action === 'long' || action === 'short') {
-    const ref = lane.last;
-    if (action === 'short' && lane.canShort === false) blocked = 'no_short';
-    else if (loss) blocked = 'daily_loss';
-    else if (topped) blocked = 'target_reached';
-    else if (confidence < minConfidence) blocked = 'low_conviction';
-    else if (!ref || stop === null || target === null) blocked = 'invalid_setup';
-    else {
-      const stopDistance = action === 'long' ? ((ref - stop) / ref) * 100 : ((stop - ref) / ref) * 100;
-      const gain = action === 'long' ? ((target - ref) / ref) * 100 : ((ref - target) / ref) * 100;
-      if (stopDistance <= 0 || gain <= 0) blocked = 'invalid_setup';
-      else if (stopDistance > maxStop) blocked = 'stop_too_wide';
-      else if (stopDistance < minStop) blocked = 'stop_too_tight';
-      else if (gain <= fee * 2 + 0.1) blocked = 'no_edge';
+  let side = null;
+  let showEntry = null;
+  let showStop = null;
+  let showTarget = null;
+  let showSize = null;
+  let candidate = null;
+  if (pos) {
+    side = pos.side;
+    showEntry = pos.entry;
+    showStop = pos.stop;
+    showTarget = pos.target;
+  } else if (pend) {
+    side = pend.side;
+    showEntry = pend.limit;
+    showStop = pend.stop;
+    showTarget = pend.target;
+  }
+  if (hardBlock) {
+    blocked = hardBlock;
+  } else if (pos) {
+    const dir = pos.side === 'long' ? 1 : -1;
+    const mkt = pos.side === 'long' ? lane.bid : lane.ask;
+    let closeWhy = null;
+    if (mkt) {
+      if (pos.stopMissing) closeWhy = 'stop_missing';
+      else if (lane.last && pos.target && dir * (lane.last - pos.target) >= 0) closeWhy = 'target_hit';
+      else if (aiAction === 'close') closeWhy = 'model_close';
+      else if (pos.hours >= timeStopHours && pos.rNow !== null && pos.rNow < 0.5) closeWhy = 'time_stop';
+      let want = pos.stop;
+      let why = '';
+      if (!closeWhy) {
+        if (pos.mfeR >= beR && dir * (pos.entry - want) > 0) { want = pos.entry; why = 'break-even after +' + beR + 'R'; }
+        if (pos.mfeR >= trailR && atr4 > 0) {
+          const trail = pos.best - dir * trailAtr * atr4;
+          if (dir * (trail - want) > 0) { want = trail; why = 'trailing ' + trailAtr + ' ATR 4h behind the best price'; }
+        }
+        if (why && dir * (mkt - want) <= atr1 * 0.1) closeWhy = 'trail_exit';
+      }
+      if (!closeWhy) {
+        if (aiAction === 'manage' && stopCall !== null && dir * (stopCall - want) > 0) {
+          if (dir * (mkt - stopCall) > atr1 * 0.5) { want = stopCall; why = 'your call'; }
+          else blocked = 'stop_too_close';
+        }
+        want = pos.side === 'long' ? floorTo(want, digits) : ceilTo(want, digits);
+        const ids = Array.isArray(pos.stopIds) ? pos.stopIds : [];
+        if (!ids.length) {
+          if (dir * (mkt - want) > 0) amends.push({ kind: 'stop', symbol: lane.symbol, pair: lane.pair, side: pos.side, volume: Number(pos.volume).toFixed(8), stop: want.toFixed(digits), leverage: leverage, userref: userref, why: why || 'the stop order was missing' });
+          else closeWhy = 'stop_missing';
+        } else if (dir * (want - pos.stop) > atr1 * 0.1) {
+          for (const txid of ids) amends.push({ kind: 'amend', symbol: lane.symbol, pair: lane.pair, txid: txid, stop: want.toFixed(digits), why: why });
+        }
+      }
+      if (!closeWhy) {
+        if (aiAction === 'manage' && targetCall !== null) {
+          if (dir * (targetCall - mkt) > atr1 * 0.5) {
+            if (store.positions[lane.pair]) store.positions[lane.pair].target = targetCall;
+            showTarget = targetCall;
+            notes.push('Target moved to ' + targetCall + '.');
+          } else if (!blocked) blocked = 'invalid_setup';
+        }
+        action = aiAction === 'manage' ? 'manage' : 'hold';
+        if (aiAction === 'long' || aiAction === 'short') blocked = 'already_in_position';
+        if (!blocked && softBlock) blocked = softBlock;
+      }
+    } else if (softBlock) blocked = softBlock;
+    if (closeWhy) {
+      action = 'close';
+      blocked = closeWhy === 'model_close' ? null : closeWhy;
+      for (const txid of pos.stopIds || []) cancels.push({ kind: 'cancel', symbol: lane.symbol, pair: lane.pair, txid: txid });
+      closes.push({ kind: 'close', symbol: lane.symbol, pair: lane.pair, side: pos.side, volume: Number(pos.volume).toFixed(8), last: lane.last, leverage: leverage, why: closeWhy });
+    } else {
+      slotsUsed += 1;
+      if (pos.side === 'short') reserved += (pos.volume * pos.entry) / leverage;
     }
-    if (blocked) action = 'hold';
+    if (pend) cancels.push({ kind: 'cancel', symbol: lane.symbol, pair: lane.pair, txid: pend.txid, pending: true });
+  } else if (pend) {
+    if (aiAction === 'close') {
+      action = 'close';
+      cancels.push({ kind: 'cancel', symbol: lane.symbol, pair: lane.pair, txid: pend.txid, pending: true });
+    } else {
+      if (aiAction === 'long' || aiAction === 'short') blocked = 'order_pending';
+      else if (softBlock) blocked = softBlock;
+      if (!pend.cancelled) {
+        slotsUsed += 1;
+        reserved += pend.side === 'long' ? pend.volume * pend.limit : (pend.volume * pend.limit) / leverage;
+      }
+    }
+  } else if (softBlock) {
+    blocked = softBlock;
+  } else if (!call) {
+    blocked = 'unreadable';
+  } else if (aiAction === 'close' || aiAction === 'manage') {
+    blocked = 'already_flat';
+  } else if (aiAction === 'long' || aiAction === 'short') {
+    const dir = aiAction === 'long' ? 1 : -1;
+    const mkt = aiAction === 'long' ? lane.bid : lane.ask;
+    side = aiAction;
+    showStop = stopCall;
+    showTarget = targetCall;
+    showSize = sizeCall;
+    showEntry = entryCall;
+    if (aiAction === 'short' && lane.canShort === false) blocked = 'no_short';
+    else if (lane.cooldown && lane.cooldown.side === aiAction && Number(lane.cooldown.until) > nowSec) blocked = 'cooldown';
+    else if (confidence < minConfidence) blocked = 'low_conviction';
+    else if (!mkt || !atr4 || stopCall === null || targetCall === null) blocked = 'invalid_setup';
+    else {
+      let limit = entryCall === null ? mkt : entryCall;
+      if (dir * (limit - mkt) > 0) limit = mkt;
+      limit = aiAction === 'long' ? floorTo(limit, digits) : ceilTo(limit, digits);
+      showEntry = limit;
+      const stopDistance = ((dir * (limit - stopCall)) / limit) * 100;
+      const gain = ((dir * (targetCall - limit)) / limit) * 100;
+      const atrPct = (atr4 / limit) * 100;
+      const setupType = String(call.setupType || 'other');
+      if (stopDistance <= 0 || gain <= 0) blocked = 'invalid_setup';
+      else if (dir * (mkt - limit) > atr1 * 2.5) blocked = 'entry_too_far';
+      else if (stopDistance < minStopAtr * atrPct) blocked = 'stop_too_tight';
+      else if (stopDistance > Math.min(maxStopAtr * atrPct, maxStopPct)) blocked = 'stop_too_wide';
+      else if ((gain - feeRT) / (stopDistance + feeRT) < minNetRR) blocked = 'weak_reward';
+      else if ((setupType === 'trend_pullback' || setupType === 'breakout') && lane.ema20h4 && (dir * (limit - lane.ema20h4)) / atr4 > 3) blocked = 'overextended';
+      else candidate = { lane: lane, action: aiAction, confidence: confidence, limit: limit, stop: stopCall, target: targetCall, sizePct: sizeCall, stopDistance: stopDistance, setupType: setupType };
+    }
+    if (blocked) side = null;
+    else action = aiAction;
   }
   const coin = {
     symbol: lane.symbol,
     pair: lane.pair,
     action: action,
     aiAction: aiAction,
+    setupType: call && call.setupType && call.setupType !== 'none' ? String(call.setupType) : pos ? pos.setupType || null : null,
     confidence: confidence,
     line: call && call.line ? String(call.line) : '',
     setup: call && call.setup ? String(call.setup) : '',
     invalidation: call && call.invalidation ? String(call.invalidation) : '',
-    stop: pos ? pos.stop : stop,
-    target: pos ? pos.target : target,
-    sizePct: pos ? null : sizePct,
-    side: pos ? pos.side : action === 'long' || action === 'short' ? action : null,
-    entry: pos ? pos.entry : null,
+    entry: showEntry,
+    stop: showStop,
+    target: showTarget,
+    sizePct: showSize,
+    side: side,
     pnlPct: pos ? pos.pnlPct : null,
-    note: lane.exit || '',
+    r: pos ? pos.rNow : null,
+    note: notes.join(' '),
     blockedByRule: blocked,
     order: null,
     inPosition: Boolean(pos),
   };
   coins.push(coin);
-  if (action === 'close' && pos) {
-    for (const txid of pos.stopIds || []) cancels.push({ kind: 'cancel', symbol: lane.symbol, pair: lane.pair, txid: txid });
-    closes.push({ kind: 'close', symbol: lane.symbol, pair: lane.pair, side: pos.side, volume: Number(pos.volume).toFixed(8), last: lane.last, leverage: leverage });
-  }
-  if (action === 'long' || action === 'short') candidates.push({ coin: coin, lane: lane, action: action, confidence: confidence, stop: stop, target: target, sizePct: sizePct });
+  if (candidate) { candidate.coin = coin; candidates.push(candidate); }
 }
-const stillOpen = lanes.filter((lane) => lane.holding).length - closes.length;
-let slots = Math.max(0, maxPositions - stillOpen);
-let eurLeft = (Number(row.eurFree) || 0) * 0.98;
+let slots = Math.max(0, maxPositions - slotsUsed);
+let eurLeft = Math.max(0, (Number(row.eurFree) || 0) - reserved) * 0.98;
 const opens = [];
 candidates.sort((left, right) => right.confidence - left.confidence);
 for (const pick of candidates) {
   const coin = pick.coin;
   const lane = pick.lane;
+  const digits = Number(lane.pdec) || 2;
   if (slots <= 0) { coin.action = 'hold'; coin.blockedByRule = 'max_positions'; coin.side = null; continue; }
-  const pct = Math.min(maxSizePct, Math.max(5, pick.sizePct === null ? maxSizePct : pick.sizePct));
+  const riskCap = (riskPct / (pick.stopDistance + feeRT)) * 100;
+  const pct = Math.min(maxSizePct, pick.sizePct === null ? maxSizePct : Math.max(5, pick.sizePct), riskCap);
   let sizeEur = (equity * pct) / 100;
   const perEuro = pick.action === 'long' ? 1 : 1 / leverage;
   if (sizeEur * perEuro > eurLeft) sizeEur = eurLeft / perEuro;
-  const price = pick.action === 'long' ? lane.ask : lane.bid;
-  if (!price || sizeEur < 5) { coin.action = 'hold'; coin.blockedByRule = 'max_size'; coin.side = null; continue; }
-  const volume = sizeEur / price;
+  if (sizeEur < 5) { coin.action = 'hold'; coin.blockedByRule = 'max_size'; coin.side = null; continue; }
+  const volume = sizeEur / pick.limit;
   if (volume < lane.ordermin) { coin.action = 'hold'; coin.blockedByRule = 'below_minimum'; coin.side = null; continue; }
   coin.sizePct = Number(((sizeEur / (equity || sizeEur)) * 100).toFixed(1));
+  coin.stop = Number(Number(pick.stop).toFixed(digits));
+  coin.target = Number(Number(pick.target).toFixed(digits));
   opens.push({
     kind: 'open', symbol: lane.symbol, pair: lane.pair, side: pick.action, volume: volume.toFixed(8),
-    stop: Number(pick.stop).toFixed(lane.pdec), target: Number(pick.target), last: lane.last, sizeEur: Number(sizeEur.toFixed(2)),
-    leverage: leverage, userref: Number(config.orbitRef),
+    limit: pick.limit.toFixed(digits), stop: Number(pick.stop).toFixed(digits), target: coin.target, last: lane.last, sizeEur: Number(sizeEur.toFixed(2)),
+    leverage: leverage, userref: userref, expire: nowSec + Math.round(Number(config.entryTtlMin) * 60),
+    setup: coin.setup, setupType: pick.setupType, invalidation: coin.invalidation, trend: lane.trend,
   });
   eurLeft -= sizeEur * perEuro;
   slots -= 1;
 }
-const orders = cancels.concat(closes, opens);
+const orders = cancels.concat(closes, amends, opens);
 return [{ json: {
   pair: 'ten',
-  action: opens.length || closes.length ? 'trade' : 'hold',
+  action: opens.length || closes.length ? 'trade' : amends.length ? 'manage' : 'hold',
   aiAction: null,
   reason: row.reason || '',
   thesis: row.thesis || '',
   invalidation: '',
   mood: row.mood || '',
   confidence: null,
-  blockedByRule: bookBlock,
+  blockedByRule: hardBlock || softBlock,
   order: null,
   equityQuote: row.equityEur,
   dayPnlPct: pnl,
   inPosition: coins.some((coin) => coin.inPosition),
+  fees: fees,
   coins: coins,
   orders: orders,
   placeAny: orders.length > 0,
@@ -542,12 +1103,20 @@ let postData = 'nonce=' + nonce;
 if (order.kind === 'cancel') {
   path = '/0/private/CancelOrder';
   postData += '&txid=' + encodeURIComponent(order.txid);
+} else if (order.kind === 'amend') {
+  path = '/0/private/AmendOrder';
+  postData += '&txid=' + encodeURIComponent(order.txid) + '&trigger_price=' + order.stop;
 } else if (order.kind === 'close') {
   postData += '&ordertype=market&pair=' + encodeURIComponent(order.pair) + '&volume=' + order.volume;
   if (order.side === 'long') postData += '&type=sell';
   else postData += '&type=buy&leverage=' + order.leverage + '&reduce_only=true';
+} else if (order.kind === 'stop') {
+  postData += '&ordertype=stop-loss&pair=' + encodeURIComponent(order.pair) + '&volume=' + order.volume + '&price=' + order.stop + '&userref=' + order.userref;
+  if (order.side === 'long') postData += '&type=sell';
+  else postData += '&type=buy&leverage=' + order.leverage + '&reduce_only=true';
 } else {
-  postData += '&ordertype=market&pair=' + encodeURIComponent(order.pair) + '&volume=' + order.volume + '&userref=' + order.userref;
+  postData += '&ordertype=limit&pair=' + encodeURIComponent(order.pair) + '&volume=' + order.volume + '&price=' + order.limit;
+  postData += '&oflags=post&timeinforce=GTD&expiretm=' + order.expire + '&userref=' + order.userref;
   postData += '&type=' + (order.side === 'long' ? 'buy' : 'sell');
   if (order.side === 'short') postData += '&leverage=' + order.leverage;
   postData += '&close%5Bordertype%5D=stop-loss&close%5Bprice%5D=' + order.stop;
@@ -557,66 +1126,109 @@ return [{ json: { apiSign: signed.apiSign, postData: signed.postData, path: path
 
 const recordCode = `const response = $input.first().json;
 const store = $getWorkflowStaticData('global');
-const pending = store.scratch && store.scratch.pending ? store.scratch.pending : {};
+const order = store.scratch && store.scratch.pending ? store.scratch.pending : {};
 if (!Array.isArray(store.scratch.fills)) store.scratch.fills = [];
 const errors = Array.isArray(response.error) ? response.error.filter(Boolean) : [];
 const message = response.error && !Array.isArray(response.error) ? String(response.error.message || response.error) : '';
-const txid = response.result && Array.isArray(response.result.txid) ? response.result.txid[0] : null;
-const descr = response.result && response.result.descr ? response.result.descr.order : null;
-const rejected = pending.kind === 'cancel' ? errors.length > 0 || Boolean(message) : errors.length > 0 || Boolean(message) || !txid;
-store.scratch.fills.push({
-  kind: pending.kind, pair: pending.pair, side: pending.side, rejected: rejected, txid: txid, descr: descr,
-  note: errors.join(', ') || message || '', volume: pending.volume, last: pending.last, stop: pending.stop, target: pending.target, sizeEur: pending.sizeEur,
-});
-return [{ json: { pair: pending.pair, kind: pending.kind, rejected: rejected } }];`;
+const result = response.result || {};
+const txid = Array.isArray(result.txid) ? result.txid[0] : null;
+const descr = result.descr ? result.descr.order : null;
+const failed = errors.length > 0 || Boolean(message);
+let rejected = failed || !txid;
+if (order.kind === 'cancel') rejected = failed;
+if (order.kind === 'amend') rejected = failed || !result.amend_id;
+store.scratch.fills.push({ order: order, rejected: rejected, txid: txid, descr: descr, note: errors.join(', ') || message || '' });
+return [{ json: { pair: order.pair, kind: order.kind, rejected: rejected } }];`;
 
-const assembleCode = `const gate = $('Risk Gate').first().json;
+const assembleCode = `function clock(seconds) {
+  return new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Amsterdam', hour: '2-digit', minute: '2-digit' }).format(new Date(seconds * 1000));
+}
+function sg(value) {
+  return (value > 0 ? '+' : '') + Number(value).toFixed(2);
+}
+const gate = $('Risk Gate').first().json;
+const config = $('Desk Config').first().json;
 const store = $getWorkflowStaticData('global');
 if (!store.positions || typeof store.positions !== 'object') store.positions = {};
+if (!store.pending || typeof store.pending !== 'object') store.pending = {};
+if (!store.cooldown || typeof store.cooldown !== 'object') store.cooldown = {};
+if (!Array.isArray(store.history)) store.history = [];
 const positions = store.positions;
 const fills = store.scratch && Array.isArray(store.scratch.fills) ? store.scratch.fills : [];
 const now = Math.floor(Date.now() / 1000);
+const feeRT = gate.fees ? Number(gate.fees.maker) + Number(gate.fees.taker) : Number(config.makerFeePct) + Number(config.takerFeePct);
+const reasons = { target_hit: 'target reached', model_close: 'closed by Orbit', time_stop: 'time stop', trail_exit: 'protective stop by the desk', stop_missing: 'closed, the stop was gone' };
 const coins = (Array.isArray(gate.coins) ? gate.coins : []).map((coin) => {
-  const mine = fills.filter((fill) => fill.pair === coin.pair);
+  const mine = fills.filter((fill) => fill.order && fill.order.pair === coin.pair);
   if (!mine.length) return coin;
   const next = Object.assign({}, coin);
   const notes = coin.note ? [coin.note] : [];
-  const cancelled = mine.some((fill) => fill.kind === 'cancel' && !fill.rejected);
-  const cancelFailed = mine.some((fill) => fill.kind === 'cancel' && fill.rejected);
-  const close = mine.find((fill) => fill.kind === 'close');
-  const open = mine.find((fill) => fill.kind === 'open');
-  if (close) {
+  const stopCancelled = mine.some((fill) => fill.order.kind === 'cancel' && !fill.order.pending && !fill.rejected);
+  const stopCancelFailed = mine.some((fill) => fill.order.kind === 'cancel' && !fill.order.pending && fill.rejected);
+  for (const fill of mine) {
+    const order = fill.order;
     const pos = positions[coin.pair];
-    if (close.rejected) {
-      if (pos && cancelled) pos.stopMissing = true;
-      next.action = 'hold';
-      next.blockedByRule = 'exchange_rejected';
-      notes.push('Kraken rejected the close' + (close.note ? ': ' + close.note : '.') + (cancelled ? ' The stop is gone, so the desk retries next round.' : ''));
-    } else {
-      if (pos && pos.entry && close.last) {
-        const move = pos.side === 'long' ? (close.last - pos.entry) / pos.entry : (pos.entry - close.last) / pos.entry;
-        notes.push('Closed near ' + close.last + ', ' + (move * 100).toFixed(2) + '% from the entry before fees.');
-      }
-      if (cancelFailed) notes.push('Kraken did not cancel the old stop order. Check open orders on Kraken.');
-      delete positions[coin.pair];
-      next.inPosition = false;
-      next.order = { type: 'market', side: close.side === 'long' ? 'sell' : 'buy', volume: String(close.volume), txid: close.txid, descr: close.descr };
+    if (order.kind === 'cancel' && order.pending) {
+      if (!fill.rejected && store.pending[coin.pair]) store.pending[coin.pair].cancelled = true;
+      notes.push(fill.rejected ? 'Kraken did not cancel the resting order' + (fill.note ? ': ' + fill.note : '.') : 'The resting limit order is cancelled.');
     }
-  }
-  if (open) {
-    if (open.rejected) {
-      next.action = 'hold';
-      next.side = null;
-      next.blockedByRule = 'exchange_rejected';
-      notes.push('Kraken rejected the order' + (open.note ? ': ' + open.note : '.'));
-    } else {
-      positions[coin.pair] = {
-        side: open.side, volume: Number(open.volume), entry: Number(open.last), stop: Number(open.stop), target: Number(open.target),
-        openedAt: now - 30, sizeEur: open.sizeEur, txid: open.txid,
-      };
-      next.inPosition = true;
-      next.entry = Number(open.last);
-      next.order = { type: 'market', side: open.side === 'long' ? 'buy' : 'sell', volume: String(open.volume), txid: open.txid, descr: open.descr };
+    if (order.kind === 'close') {
+      if (fill.rejected) {
+        if (pos && stopCancelled) pos.stopMissing = true;
+        next.action = 'hold';
+        next.blockedByRule = 'exchange_rejected';
+        notes.push('Kraken rejected the close' + (fill.note ? ': ' + fill.note : '.') + (stopCancelled ? ' The stop is gone, so the desk retries next round.' : ''));
+      } else {
+        if (pos && pos.entry && order.last) {
+          const dir = pos.side === 'long' ? 1 : -1;
+          const gross = ((dir * (order.last - pos.entry)) / pos.entry) * 100;
+          const net = gross - feeRT;
+          const risk = Math.abs(pos.entry - (pos.initStop || pos.stop));
+          store.history.push({
+            symbol: coin.symbol, side: pos.side, setupType: pos.setupType || 'other', grossPct: gross, netPct: net,
+            r: risk > 0 ? (dir * (order.last - pos.entry)) / risk : null, hours: (now - Number(pos.openedAt)) / 3600, how: reasons[order.why] || 'closed by the desk', at: now,
+          });
+          if (store.history.length > 40) store.history = store.history.slice(-40);
+          if (net < 0) store.cooldown[coin.pair] = { side: pos.side, until: now + Number(config.cooldownHours) * 3600 };
+          notes.push('Closed near ' + order.last + ': ' + sg(gross) + '% on the price, about ' + sg(net) + '% after fees.');
+        }
+        if (stopCancelFailed) notes.push('Kraken did not cancel the old stop order. Check open orders on Kraken.');
+        delete positions[coin.pair];
+        next.inPosition = false;
+        next.order = { type: 'market', side: order.side === 'long' ? 'sell' : 'buy', volume: String(order.volume), txid: fill.txid, descr: fill.descr };
+      }
+    }
+    if (order.kind === 'amend') {
+      if (fill.rejected) notes.push('Kraken did not move the stop to ' + order.stop + (fill.note ? ': ' + fill.note : '.') + ' The old stop stays.');
+      else {
+        if (pos) pos.stop = Number(order.stop);
+        next.stop = Number(order.stop);
+        notes.push('Stop moved to ' + order.stop + ' (' + order.why + ').');
+      }
+    }
+    if (order.kind === 'stop') {
+      if (fill.rejected) notes.push('No stop order was live and Kraken refused a new one' + (fill.note ? ': ' + fill.note : '.') + ' Check this position on Kraken.');
+      else {
+        if (pos) pos.stop = Number(order.stop);
+        next.stop = Number(order.stop);
+        notes.push('A new stop order sits at ' + order.stop + ' (' + order.why + ').');
+      }
+    }
+    if (order.kind === 'open') {
+      if (fill.rejected) {
+        next.action = 'hold';
+        next.side = null;
+        next.blockedByRule = 'exchange_rejected';
+        notes.push('Kraken rejected the order' + (fill.note ? ': ' + fill.note : '.'));
+      } else {
+        store.pending[coin.pair] = {
+          txid: fill.txid, side: order.side, limit: Number(order.limit), volume: Number(order.volume), stop: Number(order.stop), target: Number(order.target),
+          placedAt: now, expireAt: Number(order.expire), sizeEur: order.sizeEur, setup: order.setup || '', setupType: order.setupType || 'other', invalidation: order.invalidation || '', trend: order.trend,
+        };
+        next.entry = Number(order.limit);
+        next.order = { type: 'limit', side: order.side === 'long' ? 'buy' : 'sell', volume: String(order.volume), txid: fill.txid, descr: fill.descr };
+        notes.push('Limit order resting at ' + order.limit + ' until ' + clock(Number(order.expire)) + '. It becomes a position only if the price comes to it.');
+      }
     }
   }
   next.note = notes.join(' ');
@@ -629,30 +1241,8 @@ return [{ json: {
   coins: coins, at: new Date().toISOString(),
 } }];`;
 
-const offlineCode = `let dossier = {};
-try { dossier = $('Dossier').first().json; } catch (error) { dossier = {}; }
-let lanes = Array.isArray(dossier.lanes) ? dossier.lanes : [];
-if (!lanes.length) {
-  try { lanes = JSON.parse($('Desk Config').first().json.lanes); } catch (error) { lanes = []; }
-}
-const coins = lanes.map((lane) => ({
-  symbol: lane.symbol, pair: lane.pair, action: 'hold', aiAction: 'hold', confidence: 0,
-  line: 'The lamp is on. The model is not.', invalidation: 'This line drops once the model returns a journal.',
-  side: lane.position ? lane.position.side : null, stop: lane.position ? lane.position.stop : null, target: lane.position ? lane.position.target : null,
-  note: lane.exit || '', blockedByRule: 'model_offline', order: null, inPosition: Boolean(lane.holding),
-}));
-return [{ json: {
-  pair: 'ten', action: 'hold', aiAction: 'hold',
-  reason: 'The ring on the desk is lit, but OpenAI did not answer. Until it does, Orbit opens nothing. Stops already on Kraken stay in place.',
-  thesis: 'No model, no new order.', invalidation: '', mood: 'waiting', confidence: null,
-  blockedByRule: 'model_offline', order: null,
-  equityQuote: dossier.equityEur === undefined ? null : dossier.equityEur,
-  dayPnlPct: dossier.dayPnlPct === undefined ? null : dossier.dayPnlPct,
-  inPosition: coins.some((coin) => coin.inPosition), coins: coins, orders: [], placeAny: false, at: new Date().toISOString(),
-} }];`;
-
 const keysNoteText = 'Kraken key and secret live in the data table orbit_kraken. No withdraw permission. Shorts run on Kraken margin with the same key, so margin must be enabled on the account. Without the row Orbit reads prices and writes wait.';
-const gateNoteText = 'Orbit picks and plans every trade. The Risk Gate checks it: at most two positions, each at most 45% of desk equity, a stop within 1.5%, a target that pays the fees, conviction above 0.62, and the day limits. Every opening carries a real stop-loss on Kraken. The numbers live on Desk Config.';
+const gateNoteText = 'Every round the Risk Gate first runs the desk rules on open positions: target touched, break-even at +1R, trailing from +1.5R, time stop. Then it checks what Orbit proposes: at most two positions, 45% each, a stop inside the ATR band, a target that pays the fees, conviction above 0.62. Entries are resting limit orders with a stop-loss attached. There is no daily limit. The numbers live on Desk Config.';
 const publishNoteText = 'Published means every hour, two minutes past. Run Now is the webhook behind the app button, guarded by the x-orbit-token header; sync.mjs sets it from ORBIT_RUN_TOKEN. Do not use Manual watch with live keys: a manual run trades but does not remember its positions.';
 
 const hourly = trigger({ type: 'n8n-nodes-base.scheduleTrigger', version: 1.4, config: { name: 'Hourly Watch', parameters: { rule: { interval: [{ field: 'hours', hoursInterval: 1, triggerAtMinute: 2 }] } }, output: [{ scheduled: true }] } });
@@ -678,8 +1268,8 @@ const fetchOrders = node({ type: 'n8n-nodes-base.httpRequest', version: 4.5, con
 const signTrades = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Sign Trades', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: signTradesCode }, output: [{ apiSign: 'sign', postData: 'nonce=3' }] } });
 const fetchTrades = node({ type: 'n8n-nodes-base.httpRequest', version: 4.5, config: { name: 'Fetch Trades', executeOnce: true, parameters: { method: 'POST', url: 'https://api.kraken.com/0/private/TradesHistory', ...privateHttp }, output: [{ error: [], result: { trades: {} } }] } });
 const dossier = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Dossier', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: dossierCode }, output: [{ brief: 'DOSSIER', hasKeys: false, lanes: [] }] } });
-const orbit = node({ type: '@n8n/n8n-nodes-langchain.openAi', version: 2.3, config: { name: 'Orbit', executeOnce: true, onError: 'continueErrorOutput', credentials: { openAiApi: newCredential('OpenAi account') }, parameters: { resource: 'text', operation: 'response', modelId: { __rl: true, mode: 'list', value: 'gpt-5.6-luna', cachedResultName: 'GPT-5.6-LUNA' }, simplify: true, responses: { values: [{ type: 'text', role: 'system', content: instructions }, { type: 'text', role: 'user', content: expr('{{ $json.brief }}') }] }, options: { maxTokens: 12000, store: false, reasoning: { reasoningOptions: { effort: 'medium', summary: 'concise' } }, textFormat: { textOptions: { type: 'json_schema', name: 'orbit_round', description: 'The journal of this round and the decision for each coin.', strict: true, schema: roundSchema } } } }, output: [{ output: '{"thesis":"I am waiting."}' }] } });
-const offline = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Model Offline', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: offlineCode }, output: [{ action: 'hold', blockedByRule: 'model_offline' }] } });
+const orbit = node({ type: '@n8n/n8n-nodes-langchain.openAi', version: 2.3, config: { name: 'Orbit', executeOnce: true, onError: 'continueErrorOutput', credentials: { openAiApi: newCredential('OpenAi account') }, parameters: { resource: 'text', operation: 'response', modelId: { __rl: true, mode: 'list', value: 'gpt-5.6-luna', cachedResultName: 'GPT-5.6-LUNA' }, simplify: true, responses: { values: [{ type: 'text', role: 'system', content: instructions }, { type: 'text', role: 'user', content: expr('{{ $json.brief }}') }] }, options: { maxTokens: 20000, store: false, reasoning: { reasoningOptions: { effort: 'high', summary: 'concise' } }, textFormat: { textOptions: { type: 'json_schema', name: 'orbit_round', description: 'The journal of this round and the decision for each coin.', strict: true, schema: roundSchema } } } }, output: [{ output: '{"thesis":"I am waiting."}' }] } });
+const offline = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Model Offline', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: offlineCode }, output: [{ offline: true, calls: [] }] } });
 const journal = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Read Journal', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: journalCode }, output: [{ parseError: false, calls: [] }] } });
 const gate = node({ type: 'n8n-nodes-base.code', version: 2, config: { name: 'Risk Gate', executeOnce: true, parameters: { mode: 'runOnceForAllItems', language: 'javaScript', jsCode: gateCode }, output: [{ action: 'hold', placeAny: false, coins: [] }] } });
 const place = ifElse({ version: 2.4, config: { name: 'Place Orders?', parameters: { conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 2 }, conditions: [{ leftValue: expr('{{ $json.placeAny }}'), rightValue: true, operator: { type: 'boolean', operation: 'true' } }], combinator: 'and' } }, output: [{ placeAny: false }] } });
@@ -707,7 +1297,7 @@ export default workflow('orbit-ten-lanes', 'Orbit')
   .add(manual)
   .to(desk)
   .add(dossier)
-  .to(orbit.onError(offline.to(decision)))
+  .to(orbit.onError(offline.to(gate)))
   .add(orbit)
   .to(journal)
   .to(gate)
@@ -717,4 +1307,4 @@ export default workflow('orbit-ten-lanes', 'Orbit')
   .add(publishNote)
   .group('Market', [desk, ticker, scratch, fan], { description: 'The ten pairs, the ticker, and the empty scratch pad for this round.' })
   .group('Account', [signBalance, fetchBalance, signOrders, fetchOrders, signTrades, fetchTrades], { description: 'Balance, open orders and trades. Only when the keys are present.' })
-  .group('Order', [signOrder, sendOrder, record], { description: 'Cancels, closes, then openings. Every opening carries a stop-loss on Kraken.' });
+  .group('Order', [signOrder, sendOrder, record], { description: 'Cancels, closes, stop moves, then new limit entries. Every entry carries a stop-loss on Kraken.' });
